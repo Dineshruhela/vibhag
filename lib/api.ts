@@ -1,0 +1,58 @@
+import * as SecureStore from 'expo-secure-store';
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+const TOKEN_KEY = '0b5b295c-1461-47fd-808f-822e827f39ca';
+
+/**
+ * Enhanced fetch wrapper with robust error handling and network failure reporting.
+ */
+export async function apiRequest(path: string, options: RequestInit = {}) {
+  const url = `${API_URL}${path}`;
+  const token = await SecureStore.getItemAsync(TOKEN_KEY);
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options.headers as any),
+  };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers,
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`API Error (${response.status}): ${text || response.statusText}`);
+    }
+
+    // Safely handle empty responses or non-JSON content
+    const contentType = response.headers.get('content-type');
+    if (response.status === 204 || !contentType || !contentType.includes('application/json')) {
+      return null;
+    }
+
+    return await response.json();
+  } catch (error: any) {
+    // Catch fetch/network errors specifically
+    if (error.message === 'Network request failed') {
+      throw new Error(`Connection Error: Unable to reach the server at ${API_URL}. Please check your internet connection or server status.`);
+    }
+    throw error;
+  }
+}
+
+export const api = {
+  signup: (data: any) => apiRequest('/auth/signup', { method: 'POST', body: JSON.stringify(data) }),
+  login: (data: any) => apiRequest('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
+  push: (data: any) => apiRequest('/api/sync/push', { method: 'POST', body: JSON.stringify(data) }),
+  pull: (lastSync: number) => apiRequest(`/api/sync/pull?lastSync=${lastSync}`),
+  searchOrCreateUser: (data: { email: string; name: string; avatar_color?: string }) => apiRequest('/api/users/search-or-create', { method: 'POST', body: JSON.stringify(data) }),
+  setToken: (token: string) => SecureStore.setItemAsync(TOKEN_KEY, token),
+  getToken: () => SecureStore.getItemAsync(TOKEN_KEY),
+  logout: () => SecureStore.deleteItemAsync(TOKEN_KEY),
+};

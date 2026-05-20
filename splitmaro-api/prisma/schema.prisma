@@ -1,0 +1,124 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String   @id @default(uuid())
+  name            String
+  email           String?  @unique
+  phone           String?
+  avatar_color    String
+  upi_id          String?
+  is_pro          Int      @default(0)
+  is_current_user Int      @default(0)
+  budget_amount   Float?
+  password_hash   String?
+  push_token      String?
+  created_at      BigInt
+  updated_at      BigInt?
+
+  member_of       GroupMember[]
+  expenses_created Expense[]
+  payers           ExpensePayer[]
+  shares           ExpenseShare[]
+  settlements_paid Settlement[]  @relation("paid_by")
+  settlements_received Settlement[] @relation("received_by")
+  comments         ExpenseComment[]
+}
+
+model Group {
+  id          String   @id @default(uuid())
+  name        String
+  category    String?  @default("other")
+  cover_image String?
+  created_by  String?
+  created_at  BigInt
+  updated_at  BigInt
+
+  members     GroupMember[]
+  expenses    Expense[]
+  settlements Settlement[]
+}
+
+model GroupMember {
+  group_id String
+  user_id  String
+  group    Group  @relation(fields: [group_id], references: [id], onDelete: Cascade)
+  user     User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@id([group_id, user_id])
+}
+
+model Expense {
+  id                        String   @id @default(uuid())
+  group_id                  String
+  description               String
+  amount                    Float
+  currency                  String?  @default("INR")
+  category                  String?  @default("general")
+  split_type                String?  @default("equal")
+  receipt_uri               String?
+  notes                     String?
+  recurring_type            String?  @default("none")
+  recurring_last_generated  BigInt?
+  is_recurring_parent       Int      @default(0)
+  created_by                String
+  created_at                BigInt
+  updated_at                BigInt
+
+  group                     Group    @relation(fields: [group_id], references: [id], onDelete: Cascade)
+  creator                   User     @relation(fields: [created_by], references: [id], onDelete: Cascade)
+  payers                    ExpensePayer[]
+  shares                    ExpenseShare[]
+  comments                  ExpenseComment[]
+}
+
+model ExpensePayer {
+  expense_id String
+  user_id    String
+  amount     Float
+  expense    Expense @relation(fields: [expense_id], references: [id], onDelete: Cascade)
+  user       User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@id([expense_id, user_id])
+}
+
+model ExpenseShare {
+  expense_id   String
+  user_id      String
+  share_amount Float
+  expense      Expense @relation(fields: [expense_id], references: [id], onDelete: Cascade)
+  user         User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@id([expense_id, user_id])
+}
+
+model Settlement {
+  id         String   @id @default(uuid())
+  group_id   String
+  payer_id   String
+  payee_id   String
+  amount     Float
+  note       String?
+  created_at BigInt
+
+  group      Group    @relation(fields: [group_id], references: [id], onDelete: Cascade)
+  payer      User     @relation("paid_by", fields: [payer_id], references: [id], onDelete: Cascade)
+  payee      User     @relation("received_by", fields: [payee_id], references: [id], onDelete: Cascade)
+}
+
+model ExpenseComment {
+  id         String   @id @default(uuid())
+  expense_id String
+  user_id    String
+  text       String
+  created_at BigInt
+
+  expense    Expense  @relation(fields: [expense_id], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
