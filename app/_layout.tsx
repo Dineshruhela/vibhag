@@ -15,7 +15,9 @@ import { useNotifications } from '@/hooks/useNotifications';
 import { useSync } from '@/hooks/useSync';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
-SplashScreen.preventAutoHideAsync();
+SplashScreen.preventAutoHideAsync().catch(() => {
+  /* silencing error/warning when splash screen is not registered or already hidden */
+});
 
 const VibhagDarkTheme = {
   ...DarkTheme,
@@ -71,7 +73,9 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (loaded) {
-      SplashScreen.hideAsync();
+      SplashScreen.hideAsync().catch(() => {
+        /* silencing error/warning when splash screen is not registered or already hidden */
+      });
     }
   }, [loaded]);
 
