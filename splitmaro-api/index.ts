@@ -8,7 +8,7 @@ import { createServer } from 'http';
 import jwt from 'jsonwebtoken';
 import { Server } from 'socket.io';
 import { v4 as uuidv4 } from 'uuid';
-
+// Load environment variables
 dotenv.config();
 
 // Fix TypeScript error for req.user
