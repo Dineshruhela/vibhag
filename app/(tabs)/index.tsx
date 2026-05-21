@@ -25,6 +25,7 @@ import {
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { api } from '../../lib/api';
+import { getCurrentUser } from '../../lib/database';
 type Balance = { userId: string; userName: string; avatarColor: string; amount: number };
 type Group = { id: string; name: string; category?: string; cover_image?: string; member_count: number };
 type User = { id: string; name: string; avatar_color: string };
@@ -52,7 +53,24 @@ export default function DashboardScreen() {
         try {
           const payloadBase64 = token.split('.')[1];
           const payload = JSON.parse(typeof atob !== 'undefined' ? atob(payloadBase64) : Buffer.from(payloadBase64, 'base64').toString('utf-8'));
+          
+          // 1. Try to find the user in the users array from the pull response
           cu = users?.find((u: any) => u.id === payload.userId) || null;
+          
+          // 2. If not found in the sync result (e.g. new user), fetch from the local SQLite database
+          if (!cu) {
+            cu = await getCurrentUser();
+          }
+
+          // 3. Fallback: construct from JWT payload if SQLite query failed/empty
+          if (!cu) {
+            cu = {
+              id: payload.userId,
+              name: payload.name || payload.email?.split('@')[0] || 'You',
+              email: payload.email || '',
+              avatar_color: '#1CC29F',
+            };
+          }
         } catch {}
       }
       if (!cu) throw new Error('No user found');
