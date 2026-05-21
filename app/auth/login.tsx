@@ -8,6 +8,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { clearAllLocalData } from '../../lib/database';
 import { supabase } from '../../lib/supabase';
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export default function LoginScreen() {
   const colors = useThemeColors();
   const router = useRouter();
@@ -21,6 +23,11 @@ export default function LoginScreen() {
   async function handleAuth() {
     if (!email || !password || (!isLogin && !name)) {
       Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+
+    if (!EMAIL_REGEX.test(email.trim())) {
+      Alert.alert('Error', 'Please enter a valid email address');
       return;
     }
 

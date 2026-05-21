@@ -39,7 +39,12 @@ export default function AddFriendScreen() {
   const handleSave = async () => {
     if (!name.trim()) { Alert.alert('Error', 'Please enter a name.'); return; }
     const trimmedEmail = email.trim().toLowerCase();
-    if (trimmedEmail && !trimmedEmail.includes('@')) { Alert.alert('Error', 'Please enter a valid email address.'); return; }
+    
+    const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (trimmedEmail && !EMAIL_REGEX.test(trimmedEmail)) { 
+      Alert.alert('Error', 'Please enter a valid email address.'); 
+      return; 
+    }
 
     setSaving(true);
     try {
