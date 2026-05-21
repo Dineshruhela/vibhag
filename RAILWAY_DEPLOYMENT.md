@@ -55,7 +55,7 @@ Save variables.
 ## Step 5: Configure Build & Deploy Settings
 1. Go to **"Settings"** tab in your Node.js service
 2. Set **Start Command**: `npm start`
-3. Set **Build Command**: `npm install && npx prisma generate && npx prisma migrate deploy`
+3. Set **Build Command**: `npm install && npx prisma generate`
 4. Save
 
 ---
