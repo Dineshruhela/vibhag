@@ -5,8 +5,8 @@ import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, DeviceEventEmitter, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { clearAllLocalData } from '../../lib/database';
-import { supabase } from '../../lib/supabase';
+import { clearAllLocalData, setupLocalUserFromAuth } from '../../lib/database';
+import { api } from '../../lib/api';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -35,13 +35,21 @@ export default function LoginScreen() {
     try {
       let result;
       if (isLogin) {
-        result = await supabase.auth.signInWithPassword({ email, password });
+        result = await api.login({ email, password });
       } else {
-        result = await supabase.auth.signUp({ email, password, options: { data: { name } } });
+        result = await api.signup({ name, email, password });
       }
-      if (result.error) {
-        throw result.error;
+
+      if (!result || !result.token || !result.user) {
+        throw new Error('Invalid response from server');
       }
+
+      // Store JWT token
+      await api.setToken(result.token);
+
+      // Setup the local SQLite user from server user details
+      await setupLocalUserFromAuth(result.user);
+
       // Remove old sync timestamp and notify app of auth change
       await AsyncStorage.removeItem('last_sync_timestamp');
       DeviceEventEmitter.emit('auth_change');
@@ -56,7 +64,7 @@ export default function LoginScreen() {
 
   // Helper: Force logout and clear all local data
   async function handleForceLogout() {
-    await supabase.auth.signOut();
+    await api.logout();
     await clearAllLocalData();
     await AsyncStorage.removeItem('last_sync_timestamp');
     DeviceEventEmitter.emit('auth_change');

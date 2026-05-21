@@ -27,7 +27,16 @@ export async function apiRequest(path: string, options: RequestInit = {}) {
 
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(`API Error (${response.status}): ${text || response.statusText}`);
+      let errMsg = text || response.statusText;
+      try {
+        const parsed = JSON.parse(text);
+        if (parsed.error) {
+          errMsg = parsed.error;
+        }
+      } catch (e) {
+        // Fallback to raw text or statusText
+      }
+      throw new Error(errMsg);
     }
 
     // Safely handle empty responses or non-JSON content
