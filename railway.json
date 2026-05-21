@@ -1,0 +1,9 @@
+{
+  "$schema": "https://railway.com/railway.schema.json",
+  "build": {
+    "buildCommand": "cd splitmaro-api && npm install && npx prisma generate"
+  },
+  "deploy": {
+    "startCommand": "cd splitmaro-api && npm start"
+  }
+}
