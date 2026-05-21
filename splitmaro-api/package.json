@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "npx prisma migrate deploy && tsx index.ts",
+    "start": "npx prisma db push && tsx index.ts",
     "dev": "tsx watch index.ts",
     "test": "jest"
   },
