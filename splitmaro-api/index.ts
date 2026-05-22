@@ -196,15 +196,15 @@ app.post('/auth/social', async (req, res) => {
       }
 
       // Verify Apple identity token
-      const APPLE_BUNDLE_ID = 'com.dineshruhela.vibhag';
+      const APPLE_BUNDLE_IDS = ['com.dineshruhela.vibhag', 'host.exp.Exponent'];
       let jwtClaims;
       try {
         jwtClaims = await appleSignin.verifyIdToken(idToken, {
-          audience: APPLE_BUNDLE_ID,
+          audience: APPLE_BUNDLE_IDS,
           ignoreExpiration: false,
         });
       } catch (verifyErr: any) {
-        throw new Error(`${verifyErr.message || verifyErr} (expected audience: "${APPLE_BUNDLE_ID}", got: "${actualAud}")`);
+        throw new Error(`${verifyErr.message || verifyErr} (expected audience: ${JSON.stringify(APPLE_BUNDLE_IDS)}, got: "${actualAud}")`);
       }
 
       if (!jwtClaims || !jwtClaims.email) {
