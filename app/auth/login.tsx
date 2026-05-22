@@ -548,7 +548,12 @@ export default function LoginScreen() {
                 {appleVerifying && (
                   <View style={styles.alignCenter}>
                     <View style={[styles.faceIdRing, { borderColor: colors.primary }]}>
-                      <Ionicons name="scan-outline" size={48} color={colors.primary} />
+                      <Ionicons name="scan-outline" size={44} color={colors.primary} />
+                      <ActivityIndicator
+                        size={84}
+                        color={colors.primary}
+                        style={StyleSheet.absoluteFillObject}
+                      />
                     </View>
                     <Text style={[styles.appleVerificationText, { color: colors.text }]}>
                       Verifying with Face ID...
