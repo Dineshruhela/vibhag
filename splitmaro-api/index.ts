@@ -252,10 +252,7 @@ app.post('/auth/social', async (req, res) => {
     res.json({ token, user });
   } catch (error: any) {
     console.error('Social Auth Error:', error);
-    if (error.message?.includes('Token used too late') || error.message?.includes('Wrong number of segments')) {
-      return res.status(401).json({ error: 'Token expired or malformed. Please try again.' });
-    }
-    res.status(500).json({ error: 'Failed to process social authentication' });
+    res.status(500).json({ error: `Failed to process social authentication: ${error.message || error}` });
   }
 });
 
