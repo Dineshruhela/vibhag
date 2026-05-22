@@ -185,6 +185,17 @@ app.post('/auth/social', async (req, res) => {
       verifiedEmail = payload.email;
       verifiedName = payload.name || fullName || payload.email;
     } else if (provider === 'apple') {
+      // Decode Apple JWT to inspect actual claims in logs
+      try {
+        const decoded = jwt.decode(idToken) as any;
+        console.error('DECODED APPLE JWT PAYLOAD:', JSON.stringify(decoded));
+        if (decoded && decoded.aud) {
+          console.error(`Actual Apple token audience (aud): "${decoded.aud}"`);
+        }
+      } catch (e) {
+        console.error('Failed to pre-decode Apple JWT:', e);
+      }
+
       // Verify Apple identity token
       const APPLE_BUNDLE_ID = 'com.dineshruhela.vibhag';
       const jwtClaims = await appleSignin.verifyIdToken(idToken, {
