@@ -21,16 +21,33 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { clearAllLocalData, setupLocalUserFromAuth } from '../../lib/database';
 import { api } from '../../lib/api';
 import { Ionicons } from '@expo/vector-icons';
-import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
-import * as AppleAuthentication from 'expo-apple-authentication';
+
+// Safe require for Google Sign-In to prevent crashing in Expo Go
+let GoogleSignin: any = null;
+let statusCodes: any = {};
+try {
+  const GoogleModule = require('@react-native-google-signin/google-signin');
+  GoogleSignin = GoogleModule.GoogleSignin;
+  statusCodes = GoogleModule.statusCodes;
+  if (GoogleSignin) {
+    GoogleSignin.configure({
+      webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+      offlineAccess: false,
+    });
+  }
+} catch (e) {
+  console.warn('Google Sign-In native module not found (ignored on Expo Go).');
+}
+
+// Safe require for Apple Authentication to prevent crashing in Expo Go
+let AppleAuthentication: any = null;
+try {
+  AppleAuthentication = require('expo-apple-authentication');
+} catch (e) {
+  console.warn('Apple Authentication native module not found (ignored on Expo Go).');
+}
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-// Configure Google Sign-In
-GoogleSignin.configure({
-  webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
-  offlineAccess: false,
-});
 
 export default function LoginScreen() {
   const colors = useThemeColors();
@@ -48,8 +65,10 @@ export default function LoginScreen() {
   const [appleAuthAvailable, setAppleAuthAvailable] = useState(false);
 
   useEffect(() => {
-    if (Platform.OS === 'ios') {
-      AppleAuthentication.isAvailableAsync().then(setAppleAuthAvailable);
+    if (Platform.OS === 'ios' && AppleAuthentication) {
+      AppleAuthentication.isAvailableAsync()
+        .then(setAppleAuthAvailable)
+        .catch(() => setAppleAuthAvailable(false));
     }
   }, []);
 
@@ -68,6 +87,14 @@ export default function LoginScreen() {
 
   // Google Sign-In
   async function handleGoogleSignIn() {
+    if (!GoogleSignin) {
+      Alert.alert(
+        'Development Build Required',
+        'Google Sign-in requires native components. Please run the app in a custom Development Build (npx expo run:ios/android or eas build) instead of standard Expo Go.'
+      );
+      return;
+    }
+
     setLoading(true);
     try {
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
@@ -86,11 +113,11 @@ export default function LoginScreen() {
 
       await handleSocialResult(result);
     } catch (error: any) {
-      if (error.code === statusCodes.SIGN_IN_CANCELLED) {
+      if (error.code === statusCodes?.SIGN_IN_CANCELLED) {
         // User cancelled, do nothing
-      } else if (error.code === statusCodes.IN_PROGRESS) {
+      } else if (error.code === statusCodes?.IN_PROGRESS) {
         // Sign-in already in progress
-      } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+      } else if (error.code === statusCodes?.PLAY_SERVICES_NOT_AVAILABLE) {
         Alert.alert('Error', 'Google Play Services are not available on this device.');
       } else {
         console.error('Google Sign-In Error:', error);
@@ -103,6 +130,14 @@ export default function LoginScreen() {
 
   // Apple Sign-In (iOS only)
   async function handleAppleSignIn() {
+    if (!AppleAuthentication) {
+      Alert.alert(
+        'Development Build Required',
+        'Apple Sign-in requires native components. Please run the app in a custom Development Build (npx expo run:ios/android or eas build) instead of standard Expo Go.'
+      );
+      return;
+    }
+
     setLoading(true);
     try {
       const credential = await AppleAuthentication.signInAsync({
