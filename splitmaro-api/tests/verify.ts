@@ -43,6 +43,10 @@ async function runTests() {
         created_at: Date.now(),
         updated_at: Date.now()
       }],
+      groupMembers: [{
+        group_id: groupId,
+        user_id: userId
+      }],
       expenses: [{
         id: expenseId,
         group_id: groupId,
@@ -80,6 +84,33 @@ async function runTests() {
       console.log('✅ Sync Pull successful (Data verified)');
     } else {
       throw new Error('Sync Pull failed: Data missing');
+    }
+
+    // 5. Social Auth (New User)
+    console.log('🌐 Testing Social Auth (New)...');
+    const socialNewEmail = `social-${Date.now()}@example.com`;
+    const socialNewRes = await axios.post(`${API_URL}/auth/social`, {
+      name: 'Social Test User',
+      email: socialNewEmail,
+      provider: 'google'
+    });
+    if (socialNewRes.data.token && socialNewRes.data.user.password_hash === null) {
+      console.log('✅ Social Auth (New) successful');
+    } else {
+      throw new Error('Social Auth (New) failed: Invalid user/token returned');
+    }
+
+    // 6. Social Auth (Existing Reconciled)
+    console.log('🔄 Testing Social Auth (Reconciled with standard)...');
+    const socialRecRes = await axios.post(`${API_URL}/auth/social`, {
+      name: 'Social Reconciled Name',
+      email: testEmail,
+      provider: 'apple'
+    });
+    if (socialRecRes.data.token && socialRecRes.data.user.id === userId) {
+      console.log('✅ Social Auth (Reconciled) successful');
+    } else {
+      throw new Error('Social Auth (Reconciled) failed: ID mismatch or token missing');
     }
 
     console.log('\n✨ ALL TESTS PASSED! API is stable. ✨');

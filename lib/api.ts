@@ -58,6 +58,13 @@ export async function apiRequest(path: string, options: RequestInit = {}) {
 export const api = {
   signup: (data: any) => apiRequest('/auth/signup', { method: 'POST', body: JSON.stringify(data) }),
   login: (data: any) => apiRequest('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
+  socialLogin: (data: {
+    email: string;
+    name: string;
+    provider: string;
+    avatar_color?: string;
+    push_token?: string;
+  }) => apiRequest('/auth/social', { method: 'POST', body: JSON.stringify(data) }),
   push: (data: any) => apiRequest('/api/sync/push', { method: 'POST', body: JSON.stringify(data) }),
   pull: (lastSync: number) => apiRequest(`/api/sync/pull?lastSync=${lastSync}`),
   searchOrCreateUser: (data: { email: string; name: string; avatar_color?: string }) => apiRequest('/api/users/search-or-create', { method: 'POST', body: JSON.stringify(data) }),

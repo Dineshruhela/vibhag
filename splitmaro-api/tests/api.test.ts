@@ -101,4 +101,52 @@ describe('Splitmaro API Integration Tests', () => {
     expect(res.status).toBe(200);
     expect(res.body.data.expenses.length).toBe(0);
   });
+
+  describe('POST /auth/social', () => {
+    const socialEmailNew = `social-new-${Date.now()}@example.com`;
+    const socialEmailExisting = testEmail; // already registered standard user
+
+    test('should create a new social user with null password_hash', async () => {
+      const res = await request(API_URL)
+        .post('/auth/social')
+        .send({
+          email: socialEmailNew,
+          name: 'Social User New',
+          provider: 'google'
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.token).toBeDefined();
+      expect(res.body.user.email).toBe(socialEmailNew);
+      expect(res.body.user.password_hash).toBeNull();
+    });
+
+    test('should reconcile and log in an existing standard user with matching email', async () => {
+      const res = await request(API_URL)
+        .post('/auth/social')
+        .send({
+          email: socialEmailExisting,
+          name: 'Social User Reconciled',
+          provider: 'apple'
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.token).toBeDefined();
+      expect(res.body.user.email).toBe(socialEmailExisting);
+      // It should keep the existing name or keep the existing password_hash
+      expect(res.body.user.password_hash).toBeDefined();
+      expect(res.body.user.id).toBe(userId);
+    });
+
+    test('should fail if email or name is missing', async () => {
+      const res = await request(API_URL)
+        .post('/auth/social')
+        .send({
+          provider: 'google'
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBeDefined();
+    });
+  });
 });

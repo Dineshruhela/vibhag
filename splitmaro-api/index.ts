@@ -154,6 +154,67 @@ app.post('/auth/login', async (req, res) => {
   }
 });
 
+app.post('/auth/social', async (req, res) => {
+  const { email, name, provider, avatar_color, push_token } = req.body;
+  if (!email || !name) {
+    return res.status(400).json({ error: 'Missing email or name' });
+  }
+
+  const normalizedEmail = email.toLowerCase().trim();
+
+  try {
+    const existingUser = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+
+    if (existingUser) {
+      const dataToUpdate: any = {};
+      
+      // Update name if it's currently empty, matches email, or if it was a placeholder friend
+      if (!existingUser.name || existingUser.name === existingUser.email) {
+        dataToUpdate.name = name;
+      }
+      if (avatar_color && (!existingUser.avatar_color || existingUser.avatar_color === '#95A5A6')) {
+        dataToUpdate.avatar_color = avatar_color;
+      }
+      if (push_token && existingUser.push_token !== push_token) {
+        dataToUpdate.push_token = push_token;
+      }
+
+      let user = existingUser;
+      if (Object.keys(dataToUpdate).length > 0) {
+        dataToUpdate.updated_at = BigInt(Date.now());
+        user = await prisma.user.update({
+          where: { id: existingUser.id },
+          data: dataToUpdate
+        });
+      }
+
+      const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET);
+      return res.json({ token, user });
+    }
+
+    // User does not exist, create new user
+    const color = avatar_color || '#' + Math.floor(Math.random() * 16777215).toString(16);
+    const user = await prisma.user.create({
+      data: {
+        id: uuidv4(),
+        name,
+        email: normalizedEmail,
+        password_hash: null, // Social user, no password hash
+        avatar_color: color,
+        push_token,
+        created_at: BigInt(Date.now()),
+        updated_at: BigInt(Date.now()),
+      }
+    });
+
+    const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET);
+    res.json({ token, user });
+  } catch (error) {
+    console.error('Social Auth Error:', error);
+    res.status(500).json({ error: 'Failed to process social authentication' });
+  }
+});
+
 // --- USER SEARCH ROUTE (Protected) ---
 
 app.get('/api/users/search', async (req: AuthRequest, res) => {
