@@ -12,6 +12,8 @@ import { Server } from 'socket.io';
 import { v4 as uuidv4 } from 'uuid';
 // @ts-ignore - apple-signin-auth has no types
 import appleSignin from 'apple-signin-auth';
+// @ts-ignore
+import Razorpay from 'razorpay';
 // Load environment variables
 dotenv.config();
 
@@ -1840,350 +1842,564 @@ app.get('/api/users/me/total-spending-for-month', authenticateToken as any, asyn
 });
 
 // --- PAYMENT INTEGRATION ENDPOINTS ---
-
-app.post('/api/payment/create-link', authenticateToken as any, async (req: AuthRequest, res) => {
+app.post('/api/create-order', authenticateToken as any, async (req: AuthRequest, res) => {
   try {
-    const userId = req.user.userId;
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+    const { amount, currency, receipt } = req.body;
+    if (!amount || amount < 100) {
+      return res.status(400).json({ error: 'Amount must be at least 100 paise' });
     }
 
-    const referenceId = `PRO_UPGRADE_${userId}_${Date.now()}`;
-    const host = req.get('host');
-    const protocol = req.protocol;
-    const backendUrl = process.env.BACKEND_URL || `${protocol}://${host}`;
-    const callbackUrl = `${backendUrl}/api/payment/callback`;
-
-    // Check if Razorpay keys are configured
     const keyId = process.env.RAZORPAY_KEY_ID;
     const keySecret = process.env.RAZORPAY_KEY_SECRET;
 
-    if (keyId && keySecret) {
-      // Call real Razorpay Payment Links API
-      try {
-        const response = await axios.post(
-          'https://api.razorpay.com/v1/payment_links',
-          {
-            amount: 49900, // ₹499 in paise
-            currency: 'INR',
-            accept_partial: false,
-            reference_id: referenceId,
-            description: 'Splitmaro Pro Upgrade',
-            customer: {
-              name: user.name,
-              email: user.email || 'customer@splitmaro.com',
-              contact: user.phone || undefined
-            },
-            notify: {
-              sms: false,
-              email: true
-            },
-            remainder_enable: false,
-            callback_url: callbackUrl,
-            callback_method: 'get'
-          },
-          {
-            headers: {
-              'Authorization': `Basic ${Buffer.from(`${keyId}:${keySecret}`).toString('base64')}`,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
-        return res.json({ payment_link_url: response.data.short_url });
-      } catch (razorpayErr: any) {
-        console.error('Razorpay API Error:', razorpayErr.response?.data || razorpayErr.message);
-        return res.status(502).json({ error: 'Failed to generate payment link with Razorpay' });
-      }
-    } else {
-      // Sandbox Mode Fallback
-      console.log(`[Payment] Razorpay keys not configured. Falling back to Sandbox Mode for reference: ${referenceId}`);
-      const mockUrl = `${backendUrl}/api/payment/mock-checkout?reference_id=${referenceId}`;
-      return res.json({ payment_link_url: mockUrl });
+    if (!keyId || !keySecret) {
+      console.log('[Create Order] Razorpay keys not configured. Returning mock order.');
+      return res.json({
+        order_id: 'order_mock_' + Math.random().toString(36).substring(2, 10),
+        amount: Number(amount),
+        currency: currency || 'INR'
+      });
+    }
+
+    const razorpay = new Razorpay({
+      key_id: keyId,
+      key_secret: keySecret,
+    });
+
+    try {
+      const order = await razorpay.orders.create({
+        amount: Number(amount),
+        currency: currency || 'INR',
+        receipt: receipt || `receipt_${Date.now()}`,
+      });
+
+      return res.json({
+        order_id: order.id,
+        amount: order.amount,
+        currency: order.currency
+      });
+    } catch (razorpayErr: any) {
+      console.error('Razorpay Order API Error:', razorpayErr);
+      return res.status(500).json({ error: 'Razorpay API failure: ' + (razorpayErr.description || razorpayErr.message || 'Unknown error') });
     }
   } catch (error) {
-    console.error('Create Link Error:', error);
+    console.error('Create Order Internal Error:', error);
     res.status(500).json({ error: String(error) });
   }
 });
 
-app.get('/api/payment/mock-checkout', async (req, res) => {
-  const { reference_id } = req.query;
-  if (!reference_id) {
-    return res.status(400).send('Missing reference_id in query parameters');
-  }
-
-  res.send(`
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Splitmaro Sandbox Checkout</title>
-      <style>
-        body {
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-          background-color: #0f0f12;
-          color: #f3f4f6;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          min-height: 100vh;
-          margin: 0;
-          padding: 20px;
-          box-sizing: border-box;
-        }
-        .checkout-card {
-          background: linear-gradient(145deg, #18181c, #111114);
-          border: 1px solid #27272a;
-          border-radius: 20px;
-          padding: 32px;
-          width: 100%;
-          max-width: 440px;
-          box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-          text-align: center;
-        }
-        .badge {
-          background: rgba(139, 92, 246, 0.1);
-          color: #a78bfa;
-          border: 1px solid rgba(139, 92, 246, 0.3);
-          padding: 6px 12px;
-          border-radius: 9999px;
-          font-size: 12px;
-          font-weight: 600;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-          display: inline-block;
-          margin-bottom: 24px;
-        }
-        .icon {
-          font-size: 48px;
-          margin-bottom: 16px;
-        }
-        h1 {
-          font-size: 24px;
-          font-weight: 700;
-          margin: 0 0 8px 0;
-          color: #ffffff;
-        }
-        p.subtitle {
-          color: #9ca3af;
-          font-size: 14px;
-          margin: 0 0 32px 0;
-        }
-        .price-box {
-          background-color: #1e1e24;
-          border-radius: 12px;
-          padding: 20px;
-          margin-bottom: 32px;
-          border: 1px solid #2e2e38;
-        }
-        .price-label {
-          color: #9ca3af;
-          font-size: 12px;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-          margin-bottom: 4px;
-        }
-        .price-val {
-          font-size: 32px;
-          font-weight: 800;
-          color: #ffffff;
-        }
-        .btn-pay {
-          background: linear-gradient(135deg, #8b5cf6, #6d28d9);
-          color: #ffffff;
-          border: none;
-          width: 100%;
-          padding: 16px;
-          font-size: 16px;
-          font-weight: 600;
-          border-radius: 12px;
-          cursor: pointer;
-          box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
-          transition: all 0.2s ease;
-        }
-        .btn-pay:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 6px 20px rgba(139, 92, 246, 0.6);
-        }
-        .btn-pay:active {
-          transform: translateY(0);
-        }
-        .footer-note {
-          font-size: 11px;
-          color: #6b7280;
-          margin-top: 24px;
-          line-height: 1.4;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="checkout-card">
-        <span class="badge">Sandbox Simulator</span>
-        <div class="icon">💎</div>
-        <h1>Splitmaro Pro Upgrade</h1>
-        <p class="subtitle">Complete your transaction using this sandbox simulation</p>
-        
-        <div class="price-box">
-          <div class="price-label">Amount to Pay</div>
-          <div class="price-val">₹499.00</div>
-        </div>
-        
-        <button class="btn-pay" onclick="simulatePayment()">Simulate Payment Success</button>
-        
-        <div class="footer-note">
-          This is a secure local simulation of Razorpay checkout flow. No real funds will be charged.
-        </div>
-      </div>
-
-      <script>
-        function simulatePayment() {
-          const urlParams = new URLSearchParams(window.location.search);
-          const referenceId = urlParams.get('reference_id');
-          if (!referenceId) {
-            alert('Missing reference_id in query parameters!');
-            return;
-          }
-          
-          const callbackUrl = '/api/payment/callback' + 
-            '?razorpay_payment_id=pay_mock_' + Math.random().toString(36).substring(2, 10) +
-            '&razorpay_payment_link_id=plink_mock_' + Math.random().toString(36).substring(2, 10) +
-            '&razorpay_payment_link_reference_id=' + encodeURIComponent(referenceId) +
-            '&razorpay_payment_link_status=paid' +
-            '&razorpay_signature=sandbox-sig';
-            
-          window.location.href = callbackUrl;
-        }
-      </script>
-    </body>
-    </html>
-  `);
-});
-
-app.get('/api/payment/callback', async (req, res) => {
+app.post('/api/verify-payment', authenticateToken as any, async (req: AuthRequest, res) => {
   try {
-    const {
-      razorpay_payment_id,
-      razorpay_payment_link_id,
-      razorpay_payment_link_reference_id,
-      razorpay_payment_link_status,
-      razorpay_signature
-    } = req.query as Record<string, string>;
+    const { razorpay_payment_id, razorpay_order_id, razorpay_signature } = req.body;
 
-    if (!razorpay_payment_link_reference_id) {
-      return res.status(400).send('Missing reference ID');
+    if (!razorpay_payment_id || !razorpay_order_id || !razorpay_signature) {
+      return res.status(400).json({ error: 'Missing fields: razorpay_payment_id, razorpay_order_id, and razorpay_signature are required' });
     }
 
-    const match = razorpay_payment_link_reference_id.match(/^PRO_UPGRADE_([a-zA-Z0-9\-]+)_(\d+)$/);
-    if (!match) {
-      return res.status(400).send('Invalid reference ID format');
-    }
-    const userId = match[1];
+    const keySecret = process.env.RAZORPAY_KEY_SECRET;
+    const isSandbox = !process.env.RAZORPAY_KEY_ID || !keySecret || razorpay_signature === 'sandbox-sig';
 
-    // Verify signature
-    const isSandbox = !process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET || razorpay_signature === 'sandbox-sig';
     if (!isSandbox) {
-      const payload = `${razorpay_payment_link_id}|${razorpay_payment_link_reference_id}|${razorpay_payment_link_status}|${razorpay_payment_id}`;
+      const payload = `${razorpay_order_id}|${razorpay_payment_id}`;
       const expectedSignature = crypto
-        .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET!)
+        .createHmac('sha256', keySecret!)
         .update(payload)
         .digest('hex');
 
       if (expectedSignature !== razorpay_signature) {
-        return res.status(400).send('Invalid signature. Verification failed.');
+        return res.status(400).json({ error: 'Signature mismatch. Verification failed.' });
+      }
+    } else {
+      console.log('[Verify Payment] Sandbox mode active. Skipping real signature check.');
+    }
+
+    const userId = req.user.userId;
+    await prisma.user.update({
+      where: { id: userId },
+      data: { is_pro: 1, updated_at: BigInt(Date.now()) }
+    });
+
+    try {
+      await sendPushNotification(userId, 'Splitmaro Pro Activated! 💎', 'Thank you for upgrading. Enjoy premium features!');
+    } catch (pushErr) {
+      console.error('Failed to send push notification:', pushErr);
+    }
+
+    return res.json({ success: true, message: 'Payment verified and profile upgraded to Pro' });
+  } catch (error) {
+    console.error('Verify Payment Internal Error:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+const checkoutHtmlTemplate = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Splitmaro Pro Checkout</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0b0a0e;
+      --card-bg: rgba(20, 18, 26, 0.7);
+      --border: rgba(255, 255, 255, 0.08);
+      --primary: #8b5cf6;
+      --primary-hover: #7c3aed;
+      --text: #ffffff;
+      --text-secondary: #a1a1aa;
+      --success: #10b981;
+      --error: #ef4444;
+    }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg);
+      background-image: 
+        radial-gradient(circle at 10% 20%, rgba(139, 92, 246, 0.15) 0%, transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(139, 92, 246, 0.1) 0%, transparent 40%);
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    
+    .card {
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 40px;
+      width: 100%;
+      max-width: 440px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #8b5cf6, #ec4899);
+    }
+    
+    .badge {
+      background: rgba(139, 92, 246, 0.15);
+      color: #a78bfa;
+      border: 1px solid rgba(139, 92, 246, 0.3);
+      padding: 6px 16px;
+      border-radius: 99px;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      display: inline-block;
+      margin-bottom: 24px;
+    }
+    
+    .diamond {
+      font-size: 56px;
+      margin-bottom: 16px;
+      display: inline-block;
+      filter: drop-shadow(0 0 10px rgba(139, 92, 246, 0.5));
+      animation: pulse 2s infinite ease-in-out;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+    }
+    
+    h1 {
+      font-size: 28px;
+      font-weight: 800;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, #ffffff 60%, #a78bfa 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    
+    .desc {
+      font-size: 15px;
+      color: var(--text-secondary);
+      margin-bottom: 32px;
+      line-height: 1.5;
+    }
+    
+    .price-box {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 32px;
+    }
+    
+    .price-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+    
+    .price-val {
+      font-size: 36px;
+      font-weight: 800;
+      color: var(--text);
+    }
+    
+    .btn {
+      width: 100%;
+      background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+      color: var(--text);
+      border: none;
+      padding: 18px;
+      font-size: 16px;
+      font-weight: 700;
+      border-radius: 14px;
+      cursor: pointer;
+      box-shadow: 0 8px 24px rgba(139, 92, 246, 0.35);
+      transition: all 0.2s ease;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 28px rgba(139, 92, 246, 0.5);
+    }
+    
+    .btn:active {
+      transform: translateY(0);
+    }
+    
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+    
+    .status-msg {
+      margin-top: 20px;
+      font-size: 14px;
+      display: none;
+      line-height: 1.4;
+    }
+    
+    .status-msg.error {
+      color: var(--error);
+      display: block;
+    }
+    
+    .status-msg.success {
+      color: var(--success);
+      display: block;
+    }
+    
+    .status-msg.info {
+      color: var(--text-secondary);
+      display: block;
+    }
+    
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      display: none;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    .loading .spinner {
+      display: block;
+    }
+    .loading .btn-text {
+      display: none;
+    }
+    
+    .footer-note {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.3);
+      margin-top: 28px;
+      line-height: 1.4;
+    }
+    
+    .success-container {
+      display: none;
+    }
+    
+    .state-success .checkout-container {
+      display: none;
+    }
+    .state-success .success-container {
+      display: block;
+      animation: fadeIn 0.4s ease;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .success-icon {
+      font-size: 64px;
+      color: var(--success);
+      margin-bottom: 20px;
+      filter: drop-shadow(0 0 15px rgba(16, 185, 129, 0.4));
+    }
+    
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      color: var(--text);
+      text-decoration: none;
+      padding: 14px 28px;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 15px;
+      display: inline-block;
+      margin-top: 24px;
+      transition: all 0.2s ease;
+    }
+    
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+  </style>
+</head>
+<body>
+  <div class="card" id="main-card">
+    <div class="checkout-container">
+      <span class="badge">Splitmaro Pro</span>
+      <div><span class="diamond">💎</span></div>
+      <h1>Upgrade to Pro</h1>
+      <p class="desc">Activate premium features including unlimited groups, detailed CSV exports, and recurring expenses.</p>
+      
+      <div class="price-box">
+        <div class="price-label">One-Time Payment</div>
+        <div class="price-val">₹499.00</div>
+      </div>
+      
+      <button class="btn" id="pay-btn" onclick="startPayment()">
+        <span class="btn-text">Upgrade Now</span>
+        <div class="spinner"></div>
+      </button>
+      
+      <div class="status-msg" id="status-text"></div>
+      
+      <div class="footer-note">
+        Secured by Razorpay. Safe & encrypted transactions.
+      </div>
+    </div>
+    
+    <div class="success-container">
+      <div class="success-icon">✓</div>
+      <h1>Upgrade Successful!</h1>
+      <p class="desc" style="margin-bottom: 20px;">Thank you for upgrading to Splitmaro Pro. Enjoy your lifetime premium benefits!</p>
+      <p class="desc" style="font-size: 13px;">You will be redirected back to the app automatically in a few seconds.</p>
+      
+      <a class="btn-secondary" href="splitmaro://pro-success">Go Back to App</a>
+    </div>
+  </div>
+
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <script>
+    const token = "<%= token %>";
+    const keyId = "<%= keyId %>";
+    const userName = "<%= name %>";
+    const userEmail = "<%= email %>";
+    
+    const payBtn = document.getElementById('pay-btn');
+    const statusText = document.getElementById('status-text');
+    const mainCard = document.getElementById('main-card');
+    
+    function setStatus(msg, type = 'info') {
+      statusText.innerText = msg;
+      statusText.className = 'status-msg ' + type;
+    }
+    
+    async function startPayment() {
+      payBtn.disabled = true;
+      payBtn.classList.add('loading');
+      setStatus('Initializing transaction...', 'info');
+      
+      try {
+        const orderRes = await fetch('/api/create-order', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+          },
+          body: JSON.stringify({
+            amount: 49900,
+            currency: 'INR',
+            receipt: 'receipt_upgrade_' + Date.now()
+          })
+        });
+        
+        if (!orderRes.ok) {
+          const errData = await orderRes.json().catch(() => ({}));
+          throw new Error(errData.error || 'Failed to create payment order');
+        }
+        
+        const order = await orderRes.json();
+        
+        if (order.order_id.startsWith('order_mock_')) {
+          setStatus('Simulating sandbox payment...', 'info');
+          await verifyPayment({
+            razorpay_payment_id: 'pay_mock_' + Math.random().toString(36).substring(2, 10),
+            razorpay_order_id: order.order_id,
+            razorpay_signature: 'sandbox-sig'
+          });
+          return;
+        }
+        
+        const options = {
+          key: keyId,
+          amount: order.amount,
+          currency: order.currency,
+          name: "Splitmaro Pro",
+          description: "Upgrade to Splitmaro Pro 💎",
+          order_id: order.order_id,
+          handler: async function (response) {
+            setStatus('Verifying payment signature...', 'info');
+            await verifyPayment({
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_signature: response.razorpay_signature
+            });
+          },
+          prefill: {
+            name: userName,
+            email: userEmail
+          },
+          theme: {
+            color: "#8b5cf6"
+          },
+          modal: {
+            ondismiss: function () {
+              payBtn.disabled = false;
+              payBtn.classList.remove('loading');
+              setStatus('Payment cancelled by user.', 'error');
+            }
+          }
+        };
+        
+        const rzp = new Razorpay(options);
+        rzp.on('payment.failed', function (resp) {
+          setStatus('Payment failed: ' + (resp.error.description || 'Unknown error'), 'error');
+          payBtn.disabled = false;
+          payBtn.classList.remove('loading');
+        });
+        
+        rzp.open();
+        
+      } catch (err) {
+        console.error(err);
+        setStatus(err.message || 'An error occurred during payment setup.', 'error');
+        payBtn.disabled = false;
+        payBtn.classList.remove('loading');
       }
     }
-
-    if (razorpay_payment_link_status === 'paid' || isSandbox) {
-      await prisma.user.update({
-        where: { id: userId },
-        data: { is_pro: 1, updated_at: BigInt(Date.now()) }
-      });
-
-      // Send push notification
-      await sendPushNotification(userId, 'Splitmaro Pro Activated! 💎', 'Thank you for upgrading. Enjoy premium features!');
-
-      res.send(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>Payment Successful</title>
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <style>
-              body {
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-                background-color: #0f0f12;
-                color: #ffffff;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                height: 100vh;
-                margin: 0;
-                padding: 20px;
-                text-align: center;
-                box-sizing: border-box;
-              }
-              .card {
-                background: linear-gradient(145deg, #18181c, #111114);
-                border: 1px solid #27272a;
-                border-radius: 20px;
-                padding: 40px;
-                max-width: 400px;
-                box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-              }
-              .icon {
-                font-size: 64px;
-                margin-bottom: 20px;
-              }
-              h1 {
-                font-size: 24px;
-                margin: 0 0 10px 0;
-                color: #10B981;
-              }
-              p {
-                color: #A1A1AA;
-                margin: 0 0 30px 0;
-                font-size: 16px;
-                line-height: 1.5;
-              }
-              .btn {
-                background: linear-gradient(135deg, #10B981, #059669);
-                color: white;
-                border: none;
-                padding: 12px 24px;
-                border-radius: 8px;
-                font-size: 16px;
-                font-weight: 600;
-                cursor: pointer;
-                text-decoration: none;
-                display: inline-block;
-                transition: background-color 0.2s;
-              }
-            </style>
-          </head>
-          <body>
-            <div class="card">
-              <div class="icon">💎</div>
-              <h1>Upgrade Successful!</h1>
-              <p>Thank you for upgrading to Splitmaro Pro. You will be redirected back to the app in a few seconds.</p>
-              <a class="btn" href="splitmaro://pro-success">Go Back to App</a>
-            </div>
-            <script>
-              setTimeout(function() {
-                window.location.href = 'splitmaro://pro-success';
-              }, 3000);
-            </script>
-          </body>
-        </html>
-      `);
-    } else {
-      res.status(400).send('Payment status was not paid');
+    
+    async function verifyPayment(paymentDetails) {
+      try {
+        const verifyRes = await fetch('/api/verify-payment', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+          },
+          body: JSON.stringify(paymentDetails)
+        });
+        
+        if (!verifyRes.ok) {
+          const errData = await verifyRes.json().catch(() => ({}));
+          throw new Error(errData.error || 'Payment verification failed');
+        }
+        
+        const result = await verifyRes.json();
+        
+        if (result.success) {
+          setStatus('Payment verified successfully!', 'success');
+          mainCard.classList.add('state-success');
+          setTimeout(() => {
+            window.location.href = 'splitmaro://pro-success';
+          }, 3000);
+        } else {
+          throw new Error('Verification did not return success status');
+        }
+      } catch (err) {
+        console.error(err);
+        setStatus(err.message || 'Error verifying payment. Please contact support.', 'error');
+        payBtn.disabled = false;
+        payBtn.classList.remove('loading');
+      }
     }
+  </script>
+</body>
+</html>`;
+
+app.get('/api/payment/checkout', async (req, res) => {
+  try {
+    const token = req.query.token as string;
+    if (!token) {
+      return res.status(400).send('Missing authorization token in query string');
+    }
+
+    let payload: any;
+    try {
+      payload = jwt.verify(token, JWT_SECRET);
+    } catch (err) {
+      return res.status(401).send('Invalid or expired authorization token');
+    }
+
+    const userId = payload.userId;
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      return res.status(404).send('User not found');
+    }
+
+    const escapedToken = JSON.stringify(token).slice(1, -1);
+    const escapedKeyId = JSON.stringify(process.env.RAZORPAY_KEY_ID || '').slice(1, -1);
+    const escapedName = JSON.stringify(user.name || '').slice(1, -1);
+    const escapedEmail = JSON.stringify(user.email || 'customer@splitmaro.com').slice(1, -1);
+
+    const html = checkoutHtmlTemplate
+      .replace('<%= token %>', escapedToken)
+      .replace('<%= keyId %>', escapedKeyId)
+      .replace('<%= name %>', escapedName)
+      .replace('<%= email %>', escapedEmail);
+
+    res.send(html);
   } catch (error) {
-    console.error('Error activating Pro status:', error);
-    res.status(500).send('Error upgrading user account');
+    console.error('Checkout Page Error:', error);
+    res.status(500).send('Internal Server Error');
   }
 });
 

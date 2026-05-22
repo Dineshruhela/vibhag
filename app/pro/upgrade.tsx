@@ -11,7 +11,7 @@ import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
 import { getCurrentUser, refreshCurrentUser } from '../../lib/database';
-import { apiRequest } from '../../lib/api';
+import { apiRequest, api } from '../../lib/api';
 
 export default function UpgradeScreen() {
   const colors = useThemeColors();
@@ -51,17 +51,20 @@ export default function UpgradeScreen() {
   const handleUpgrade = async () => {
     setLoading(true);
     try {
-      console.log('[UpgradeScreen] Initiating payment link creation...');
-      const response = await apiRequest('/api/payment/create-link', {
-        method: 'POST',
-      });
-
-      if (!response || !response.payment_link_url) {
-        throw new Error('Failed to generate payment link');
+      console.log('[UpgradeScreen] Fetching token for checkout...');
+      const token = await api.getToken();
+      if (!token) {
+        throw new Error('Authentication required. Please sign in again.');
       }
 
-      console.log('[UpgradeScreen] Opening payment URL:', response.payment_link_url);
-      const result = await WebBrowser.openBrowserAsync(response.payment_link_url);
+      let rawApiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+      if (rawApiUrl.startsWith('"') && rawApiUrl.endsWith('"')) {
+        rawApiUrl = rawApiUrl.slice(1, -1);
+      }
+
+      const checkoutUrl = `${rawApiUrl}/api/payment/checkout?token=${encodeURIComponent(token)}`;
+      console.log('[UpgradeScreen] Opening checkout URL:', checkoutUrl);
+      const result = await WebBrowser.openBrowserAsync(checkoutUrl);
       
       // If the user closed the browser manually, let's refresh status just in case they actually paid
       if (result.type === 'cancel') {
