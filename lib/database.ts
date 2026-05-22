@@ -50,6 +50,27 @@ export async function getCurrentUser(): Promise<User> {
   throw new Error('No user exists in the app. Please sign in or create an account');
 }
 
+export async function refreshCurrentUser(): Promise<User> {
+  const user = await apiRequest('/api/users/me');
+  if (user) {
+    const mapped: User = {
+      id: user.id,
+      name: user.name,
+      email: user.email ?? null,
+      phone: user.phone ?? null,
+      avatar_color: user.avatar_color,
+      upi_id: user.upi_id ?? null,
+      is_pro: user.is_pro ? 1 : 0,
+      budget_amount: user.budget_amount ? Number(user.budget_amount) : null,
+      is_current_user: 1,
+      created_at: Number(user.created_at),
+    };
+    await AsyncStorage.setItem('current_user_profile', JSON.stringify(mapped));
+    return mapped;
+  }
+  throw new Error('Failed to refresh user profile from backend');
+}
+
 /**
  * Called after a successful login/signup to replace the ephemeral local user
  * with the real server-authenticated user.

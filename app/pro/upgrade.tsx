@@ -6,86 +6,82 @@ import { useThemeColors } from '@/hooks/useThemeColor';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, AppState, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, DeviceEventEmitter, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { getCurrentUser, updateUser } from '../../lib/database';
+import * as WebBrowser from 'expo-web-browser';
+import { getCurrentUser, refreshCurrentUser } from '../../lib/database';
+import { apiRequest } from '../../lib/api';
 
 export default function UpgradeScreen() {
   const colors = useThemeColors();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const price = 499;
-  const payeeVPA = 'splitmaro@upi';
-  const payeeName = 'dinesh kumar ruhela';
+
+  React.useEffect(() => {
+    // Listen for custom deep link event broadcast from root layout
+    const sub = DeviceEventEmitter.addListener('pro_upgrade_success', async () => {
+      console.log('[UpgradeScreen] Received success event from deep link redirect!');
+      setLoading(true);
+      try {
+        Alert.alert('Verifying purchase...', 'Activating Splitmaro Pro 💎');
+        // Force refresh current user profile from backend
+        const updatedUser = await refreshCurrentUser();
+        console.log('[UpgradeScreen] Refreshed user:', updatedUser);
+        
+        if (updatedUser.is_pro) {
+          Alert.alert('Welcome to Pro! 💎', 'Your account has been successfully upgraded to Splitmaro Pro.', [
+            { text: 'Awesome!', onPress: () => router.back() }
+          ]);
+        } else {
+          Alert.alert('Activation Pending', 'We are still processing your payment. Please wait a moment.');
+        }
+      } catch (e: any) {
+        console.error('[UpgradeScreen] Failed to verify payment:', e);
+        Alert.alert('Verification Error', 'Failed to refresh Pro upgrade status. Please try restarting the app.');
+      } finally {
+        setLoading(false);
+      }
+    });
+
+    return () => sub.remove();
+  }, [router]);
 
   const handleUpgrade = async () => {
     setLoading(true);
-    const user = await getCurrentUser();
-    const transactionId = `SPLITMAROPRO-${user.id}-${Date.now()}`;
-    
-    // Construct the UPI deep link URL
-    const url = `upi://pay?pa=${payeeVPA}&pn=${encodeURIComponent(payeeName)}&am=${price}&tid=${transactionId}&tn=Splitmaro%20Pro%20Upgrade`;
-
     try {
-      const supported = await Linking.canOpenURL(url);
-      if (!supported) {
-        // Simulator / non-UPI environment testing bypass
-        Alert.alert(
-          'UPI App Not Found',
-          'UPI apps are not installed on this device or simulator. Would you like to simulate a successful payment for testing?',
-          [
-            {
-              text: 'Cancel',
-              style: 'cancel',
-              onPress: () => setLoading(false)
-            },
-            {
-              text: 'Simulate Payment ✅',
-              onPress: async () => {
-                Alert.alert('Verifying purchase...', 'Checking transaction status...');
-                await new Promise(resolve => setTimeout(resolve, 1500));
-                await updateUser(user.id, { is_pro: 1 });
-                Alert.alert('Welcome to Pro! 💎', 'Your account has been successfully upgraded to Splitmaro Pro.', [
-                  { text: 'Awesome!', onPress: () => router.back() }
-                ]);
-                setLoading(false);
-              }
-            }
-          ]
-        );
-        return;
+      console.log('[UpgradeScreen] Initiating payment link creation...');
+      const response = await apiRequest('/api/payment/create-link', {
+        method: 'POST',
+      });
+
+      if (!response || !response.payment_link_url) {
+        throw new Error('Failed to generate payment link');
       }
-      
-      // Open the UPI app
-      await Linking.openURL(url);
 
-      // For this example, we'll assume payment is successful after the user returns to the app.
-      // In a real app, you would need a backend webhook from your payment gateway to verify the transaction status.
-      // We listen for the app to become active again.
-      const onAppStateChange = async (nextAppState: string) => {
-        if (nextAppState === 'active') {
-          Alert.alert('Verifying purchase...', 'Checking your Pro status.');
-          // Simulate a network call to your backend to verify the transactionId
-          await new Promise(resolve => setTimeout(resolve, 3000));
-          
-          // Assume verification is successful
-          await updateUser(user.id, { is_pro: 1 });
-          Alert.alert('Welcome to Pro!', 'Your account has been upgraded to Splitmaro Pro.', [
-            { text: 'Awesome!', onPress: () => router.back() }
-          ]);
-          setLoading(false);
+      console.log('[UpgradeScreen] Opening payment URL:', response.payment_link_url);
+      const result = await WebBrowser.openBrowserAsync(response.payment_link_url);
+      
+      // If the user closed the browser manually, let's refresh status just in case they actually paid
+      if (result.type === 'cancel') {
+        console.log('[UpgradeScreen] WebBrowser closed manually by user, checking status...');
+        try {
+          const user = await refreshCurrentUser();
+          if (user.is_pro) {
+            Alert.alert('Welcome to Pro! 💎', 'Your account has been successfully upgraded to Splitmaro Pro.', [
+              { text: 'Awesome!', onPress: () => router.back() }
+            ]);
+            return;
+          }
+        } catch (e) {
+          console.warn('[UpgradeScreen] Error checking status after manual close:', e);
         }
-      };
-      
-      const subscription = AppState.addEventListener('change', onAppStateChange);
-      
-      // Clean up listener when the component unmounts or flow completes
-      // This is a simplified example; robust handling is needed for production
-      setTimeout(() => subscription.remove(), 60000); // Remove listener after 1 minute
-
-    } catch (e) {
-      Alert.alert('Error', 'Failed to initiate payment. Please try again.');
+      }
+    } catch (e: any) {
+      console.error('[UpgradeScreen] Upgrade failed:', e);
+      Alert.alert('Payment Error', e.message || 'Failed to initiate payment. Please try again.');
+    } finally {
       setLoading(false);
     }
   };

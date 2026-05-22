@@ -9,6 +9,8 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import * as Linking from 'expo-linking';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { DeviceEventEmitter } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors } from '@/constants/Colors';
 import { useNotifications } from '@/hooks/useNotifications';
@@ -55,7 +57,17 @@ export default function RootLayout() {
   // Handle deep links (e.g. splitmaro://join/GROUP_ID)
   useEffect(() => {
     const handleUrl = (event: { url: string }) => {
+      console.log('[DeepLink] Received URL:', event.url);
       const parsed = Linking.parse(event.url);
+      
+      // Check for splitmaro://pro-success
+      if (parsed.hostname === 'pro-success' || event.url.includes('pro-success')) {
+        console.log('[DeepLink] Pro upgrade success detected, dismissing browser and emitting success...');
+        WebBrowser.dismissBrowser();
+        DeviceEventEmitter.emit('pro_upgrade_success');
+        return;
+      }
+
       if (parsed.hostname === 'join' && parsed.path) {
         const groupId = parsed.path.replace(/^\//, '');
         if (groupId) router.push(`/join/${groupId}` as any);

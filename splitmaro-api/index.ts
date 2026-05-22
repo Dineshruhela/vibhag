@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import axios from 'axios';
 import bcrypt from 'bcryptjs';
 import cors from 'cors';
+import crypto from 'crypto';
 import dotenv from 'dotenv';
 import express from 'express';
 import { OAuth2Client } from 'google-auth-library';
@@ -13,6 +14,7 @@ import { v4 as uuidv4 } from 'uuid';
 import appleSignin from 'apple-signin-auth';
 // Load environment variables
 dotenv.config();
+
 
 // Fix TypeScript error for req.user
 interface AuthRequest extends express.Request {
@@ -883,7 +885,6 @@ app.put('/api/users/me', authenticateToken as any, async (req: AuthRequest, res)
     if (updates.phone !== undefined) cleanUpdates.phone = updates.phone;
     if (updates.avatar_color !== undefined) cleanUpdates.avatar_color = updates.avatar_color;
     if (updates.upi_id !== undefined) cleanUpdates.upi_id = updates.upi_id;
-    if (updates.is_pro !== undefined) cleanUpdates.is_pro = Number(updates.is_pro);
     if (updates.budget_amount !== undefined) cleanUpdates.budget_amount = updates.budget_amount !== null ? Number(updates.budget_amount) : null;
     
     cleanUpdates.updated_at = BigInt(Date.now());
@@ -985,7 +986,6 @@ app.put('/api/users/:id', authenticateToken as any, async (req: AuthRequest, res
     if (updates.phone !== undefined) cleanUpdates.phone = updates.phone;
     if (updates.avatar_color !== undefined) cleanUpdates.avatar_color = updates.avatar_color;
     if (updates.upi_id !== undefined) cleanUpdates.upi_id = updates.upi_id;
-    if (updates.is_pro !== undefined) cleanUpdates.is_pro = Number(updates.is_pro);
     if (updates.budget_amount !== undefined) cleanUpdates.budget_amount = updates.budget_amount !== null ? Number(updates.budget_amount) : null;
     
     cleanUpdates.updated_at = BigInt(Date.now());
@@ -1836,6 +1836,354 @@ app.get('/api/users/me/total-spending-for-month', authenticateToken as any, asyn
     res.json(Math.round(total * 100) / 100);
   } catch (error) {
     res.status(500).json({ error: String(error) });
+  }
+});
+
+// --- PAYMENT INTEGRATION ENDPOINTS ---
+
+app.post('/api/payment/create-link', authenticateToken as any, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user.userId;
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const referenceId = `PRO_UPGRADE_${userId}_${Date.now()}`;
+    const host = req.get('host');
+    const protocol = req.protocol;
+    const backendUrl = process.env.BACKEND_URL || `${protocol}://${host}`;
+    const callbackUrl = `${backendUrl}/api/payment/callback`;
+
+    // Check if Razorpay keys are configured
+    const keyId = process.env.RAZORPAY_KEY_ID;
+    const keySecret = process.env.RAZORPAY_KEY_SECRET;
+
+    if (keyId && keySecret) {
+      // Call real Razorpay Payment Links API
+      try {
+        const response = await axios.post(
+          'https://api.razorpay.com/v1/payment_links',
+          {
+            amount: 49900, // ₹499 in paise
+            currency: 'INR',
+            accept_partial: false,
+            reference_id: referenceId,
+            description: 'Splitmaro Pro Upgrade',
+            customer: {
+              name: user.name,
+              email: user.email || 'customer@splitmaro.com',
+              contact: user.phone || undefined
+            },
+            notify: {
+              sms: false,
+              email: true
+            },
+            remainder_enable: false,
+            callback_url: callbackUrl,
+            callback_method: 'get'
+          },
+          {
+            headers: {
+              'Authorization': `Basic ${Buffer.from(`${keyId}:${keySecret}`).toString('base64')}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+        return res.json({ payment_link_url: response.data.short_url });
+      } catch (razorpayErr: any) {
+        console.error('Razorpay API Error:', razorpayErr.response?.data || razorpayErr.message);
+        return res.status(502).json({ error: 'Failed to generate payment link with Razorpay' });
+      }
+    } else {
+      // Sandbox Mode Fallback
+      console.log(`[Payment] Razorpay keys not configured. Falling back to Sandbox Mode for reference: ${referenceId}`);
+      const mockUrl = `${backendUrl}/api/payment/mock-checkout?reference_id=${referenceId}`;
+      return res.json({ payment_link_url: mockUrl });
+    }
+  } catch (error) {
+    console.error('Create Link Error:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+app.get('/api/payment/mock-checkout', async (req, res) => {
+  const { reference_id } = req.query;
+  if (!reference_id) {
+    return res.status(400).send('Missing reference_id in query parameters');
+  }
+
+  res.send(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Splitmaro Sandbox Checkout</title>
+      <style>
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          background-color: #0f0f12;
+          color: #f3f4f6;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          min-height: 100vh;
+          margin: 0;
+          padding: 20px;
+          box-sizing: border-box;
+        }
+        .checkout-card {
+          background: linear-gradient(145deg, #18181c, #111114);
+          border: 1px solid #27272a;
+          border-radius: 20px;
+          padding: 32px;
+          width: 100%;
+          max-width: 440px;
+          box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+          text-align: center;
+        }
+        .badge {
+          background: rgba(139, 92, 246, 0.1);
+          color: #a78bfa;
+          border: 1px solid rgba(139, 92, 246, 0.3);
+          padding: 6px 12px;
+          border-radius: 9999px;
+          font-size: 12px;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          display: inline-block;
+          margin-bottom: 24px;
+        }
+        .icon {
+          font-size: 48px;
+          margin-bottom: 16px;
+        }
+        h1 {
+          font-size: 24px;
+          font-weight: 700;
+          margin: 0 0 8px 0;
+          color: #ffffff;
+        }
+        p.subtitle {
+          color: #9ca3af;
+          font-size: 14px;
+          margin: 0 0 32px 0;
+        }
+        .price-box {
+          background-color: #1e1e24;
+          border-radius: 12px;
+          padding: 20px;
+          margin-bottom: 32px;
+          border: 1px solid #2e2e38;
+        }
+        .price-label {
+          color: #9ca3af;
+          font-size: 12px;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          margin-bottom: 4px;
+        }
+        .price-val {
+          font-size: 32px;
+          font-weight: 800;
+          color: #ffffff;
+        }
+        .btn-pay {
+          background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+          color: #ffffff;
+          border: none;
+          width: 100%;
+          padding: 16px;
+          font-size: 16px;
+          font-weight: 600;
+          border-radius: 12px;
+          cursor: pointer;
+          box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+          transition: all 0.2s ease;
+        }
+        .btn-pay:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 6px 20px rgba(139, 92, 246, 0.6);
+        }
+        .btn-pay:active {
+          transform: translateY(0);
+        }
+        .footer-note {
+          font-size: 11px;
+          color: #6b7280;
+          margin-top: 24px;
+          line-height: 1.4;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="checkout-card">
+        <span class="badge">Sandbox Simulator</span>
+        <div class="icon">💎</div>
+        <h1>Splitmaro Pro Upgrade</h1>
+        <p class="subtitle">Complete your transaction using this sandbox simulation</p>
+        
+        <div class="price-box">
+          <div class="price-label">Amount to Pay</div>
+          <div class="price-val">₹499.00</div>
+        </div>
+        
+        <button class="btn-pay" onclick="simulatePayment()">Simulate Payment Success</button>
+        
+        <div class="footer-note">
+          This is a secure local simulation of Razorpay checkout flow. No real funds will be charged.
+        </div>
+      </div>
+
+      <script>
+        function simulatePayment() {
+          const urlParams = new URLSearchParams(window.location.search);
+          const referenceId = urlParams.get('reference_id');
+          if (!referenceId) {
+            alert('Missing reference_id in query parameters!');
+            return;
+          }
+          
+          const callbackUrl = '/api/payment/callback' + 
+            '?razorpay_payment_id=pay_mock_' + Math.random().toString(36).substring(2, 10) +
+            '&razorpay_payment_link_id=plink_mock_' + Math.random().toString(36).substring(2, 10) +
+            '&razorpay_payment_link_reference_id=' + encodeURIComponent(referenceId) +
+            '&razorpay_payment_link_status=paid' +
+            '&razorpay_signature=sandbox-sig';
+            
+          window.location.href = callbackUrl;
+        }
+      </script>
+    </body>
+    </html>
+  `);
+});
+
+app.get('/api/payment/callback', async (req, res) => {
+  try {
+    const {
+      razorpay_payment_id,
+      razorpay_payment_link_id,
+      razorpay_payment_link_reference_id,
+      razorpay_payment_link_status,
+      razorpay_signature
+    } = req.query as Record<string, string>;
+
+    if (!razorpay_payment_link_reference_id) {
+      return res.status(400).send('Missing reference ID');
+    }
+
+    const match = razorpay_payment_link_reference_id.match(/^PRO_UPGRADE_([a-zA-Z0-9\-]+)_(\d+)$/);
+    if (!match) {
+      return res.status(400).send('Invalid reference ID format');
+    }
+    const userId = match[1];
+
+    // Verify signature
+    const isSandbox = !process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET || razorpay_signature === 'sandbox-sig';
+    if (!isSandbox) {
+      const payload = `${razorpay_payment_link_id}|${razorpay_payment_link_reference_id}|${razorpay_payment_link_status}|${razorpay_payment_id}`;
+      const expectedSignature = crypto
+        .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET!)
+        .update(payload)
+        .digest('hex');
+
+      if (expectedSignature !== razorpay_signature) {
+        return res.status(400).send('Invalid signature. Verification failed.');
+      }
+    }
+
+    if (razorpay_payment_link_status === 'paid' || isSandbox) {
+      await prisma.user.update({
+        where: { id: userId },
+        data: { is_pro: 1, updated_at: BigInt(Date.now()) }
+      });
+
+      // Send push notification
+      await sendPushNotification(userId, 'Splitmaro Pro Activated! 💎', 'Thank you for upgrading. Enjoy premium features!');
+
+      res.send(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Payment Successful</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+              body {
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                background-color: #0f0f12;
+                color: #ffffff;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                height: 100vh;
+                margin: 0;
+                padding: 20px;
+                text-align: center;
+                box-sizing: border-box;
+              }
+              .card {
+                background: linear-gradient(145deg, #18181c, #111114);
+                border: 1px solid #27272a;
+                border-radius: 20px;
+                padding: 40px;
+                max-width: 400px;
+                box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+              }
+              .icon {
+                font-size: 64px;
+                margin-bottom: 20px;
+              }
+              h1 {
+                font-size: 24px;
+                margin: 0 0 10px 0;
+                color: #10B981;
+              }
+              p {
+                color: #A1A1AA;
+                margin: 0 0 30px 0;
+                font-size: 16px;
+                line-height: 1.5;
+              }
+              .btn {
+                background: linear-gradient(135deg, #10B981, #059669);
+                color: white;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 8px;
+                font-size: 16px;
+                font-weight: 600;
+                cursor: pointer;
+                text-decoration: none;
+                display: inline-block;
+                transition: background-color 0.2s;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="card">
+              <div class="icon">💎</div>
+              <h1>Upgrade Successful!</h1>
+              <p>Thank you for upgrading to Splitmaro Pro. You will be redirected back to the app in a few seconds.</p>
+              <a class="btn" href="splitmaro://pro-success">Go Back to App</a>
+            </div>
+            <script>
+              setTimeout(function() {
+                window.location.href = 'splitmaro://pro-success';
+              }, 3000);
+            </script>
+          </body>
+        </html>
+      `);
+    } else {
+      res.status(400).send('Payment status was not paid');
+    }
+  } catch (error) {
+    console.error('Error activating Pro status:', error);
+    res.status(500).send('Error upgrading user account');
   }
 });
 
