@@ -64,9 +64,9 @@ export const api = {
   signup: (data: any) => apiRequest('/auth/signup', { method: 'POST', body: JSON.stringify(data) }),
   login: (data: any) => apiRequest('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
   socialLogin: (data: {
-    email: string;
-    name: string;
-    provider: string;
+    idToken: string;
+    provider: 'google' | 'apple';
+    fullName?: string | null;
     avatar_color?: string;
     push_token?: string;
   }) => apiRequest('/auth/social', { method: 'POST', body: JSON.stringify(data) }),

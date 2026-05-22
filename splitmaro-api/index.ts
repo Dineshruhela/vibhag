@@ -4,10 +4,13 @@ import bcrypt from 'bcryptjs';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import express from 'express';
+import { OAuth2Client } from 'google-auth-library';
 import { createServer } from 'http';
 import jwt from 'jsonwebtoken';
 import { Server } from 'socket.io';
 import { v4 as uuidv4 } from 'uuid';
+// @ts-ignore - apple-signin-auth has no types
+import appleSignin from 'apple-signin-auth';
 // Load environment variables
 dotenv.config();
 
@@ -155,14 +158,52 @@ app.post('/auth/login', async (req, res) => {
 });
 
 app.post('/auth/social', async (req, res) => {
-  const { email, name, provider, avatar_color, push_token } = req.body;
-  if (!email || !name) {
-    return res.status(400).json({ error: 'Missing email or name' });
+  const { idToken, provider, fullName, avatar_color, push_token } = req.body;
+  if (!idToken || !provider) {
+    return res.status(400).json({ error: 'Missing idToken or provider' });
   }
 
-  const normalizedEmail = email.toLowerCase().trim();
-
   try {
+    let verifiedEmail: string;
+    let verifiedName: string;
+
+    if (provider === 'google') {
+      // Verify Google ID token
+      const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+      if (!GOOGLE_CLIENT_ID) {
+        return res.status(500).json({ error: 'Google Client ID not configured on server' });
+      }
+      const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
+      const ticket = await googleClient.verifyIdToken({
+        idToken,
+        audience: GOOGLE_CLIENT_ID,
+      });
+      const payload = ticket.getPayload();
+      if (!payload || !payload.email) {
+        return res.status(401).json({ error: 'Invalid Google token' });
+      }
+      verifiedEmail = payload.email;
+      verifiedName = payload.name || fullName || payload.email;
+    } else if (provider === 'apple') {
+      // Verify Apple identity token
+      const APPLE_BUNDLE_ID = 'com.dineshruhela.vibhag';
+      const jwtClaims = await appleSignin.verifyIdToken(idToken, {
+        audience: APPLE_BUNDLE_ID,
+        ignoreExpiration: false,
+      });
+      if (!jwtClaims || !jwtClaims.email) {
+        return res.status(401).json({ error: 'Invalid Apple token' });
+      }
+      verifiedEmail = jwtClaims.email;
+      // Apple only sends the name on the first sign-in, so the client sends it as fullName
+      verifiedName = fullName || jwtClaims.email;
+    } else {
+      return res.status(400).json({ error: 'Unsupported provider' });
+    }
+
+    const normalizedEmail = verifiedEmail.toLowerCase().trim();
+
+    // Find or create the user
     const existingUser = await prisma.user.findUnique({ where: { email: normalizedEmail } });
 
     if (existingUser) {
@@ -170,7 +211,7 @@ app.post('/auth/social', async (req, res) => {
       
       // Update name if it's currently empty, matches email, or if it was a placeholder friend
       if (!existingUser.name || existingUser.name === existingUser.email) {
-        dataToUpdate.name = name;
+        dataToUpdate.name = verifiedName;
       }
       if (avatar_color && (!existingUser.avatar_color || existingUser.avatar_color === '#95A5A6')) {
         dataToUpdate.avatar_color = avatar_color;
@@ -197,7 +238,7 @@ app.post('/auth/social', async (req, res) => {
     const user = await prisma.user.create({
       data: {
         id: uuidv4(),
-        name,
+        name: verifiedName,
         email: normalizedEmail,
         password_hash: null, // Social user, no password hash
         avatar_color: color,
@@ -209,8 +250,11 @@ app.post('/auth/social', async (req, res) => {
 
     const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET);
     res.json({ token, user });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Social Auth Error:', error);
+    if (error.message?.includes('Token used too late') || error.message?.includes('Wrong number of segments')) {
+      return res.status(401).json({ error: 'Token expired or malformed. Please try again.' });
+    }
     res.status(500).json({ error: 'Failed to process social authentication' });
   }
 });
