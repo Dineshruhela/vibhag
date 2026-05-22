@@ -1,5 +1,5 @@
 /**
- * Vibhag Typography System
+ * Splitmaro Typography System
  */
 
 export const Typography = {

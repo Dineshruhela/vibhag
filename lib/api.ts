@@ -1,6 +1,11 @@
 import * as SecureStore from 'expo-secure-store';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+let rawApiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+// Strip leading/trailing double quotes if they exist in the env variable
+if (rawApiUrl.startsWith('"') && rawApiUrl.endsWith('"')) {
+  rawApiUrl = rawApiUrl.slice(1, -1);
+}
+const API_URL = rawApiUrl;
 const TOKEN_KEY = '0b5b295c-1461-47fd-808f-822e827f39ca';
 
 /**

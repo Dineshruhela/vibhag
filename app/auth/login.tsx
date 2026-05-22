@@ -156,11 +156,11 @@ export default function LoginScreen() {
               <View style={[styles.logoContainer, { backgroundColor: colors.primaryLight }]}>
                 <Ionicons name="wallet-outline" size={32} color={colors.primary} />
               </View>
-              <Text style={[styles.title, { color: colors.text }]}>Vibhag</Text>
+              <Text style={[styles.title, { color: colors.text }]}>Splitmaro</Text>
               <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
                 {isLogin
                   ? 'Sign in to split bills and track expenses with friends.'
-                  : 'Join Vibhag to start tracking and splitting expenses with ease.'}
+                  : 'Join Splitmaro to start tracking and splitting expenses with ease.'}
               </Text>
             </View>
 
@@ -354,7 +354,7 @@ export default function LoginScreen() {
               <Ionicons name="logo-google" size={32} color="#EA4335" />
               <Text style={[styles.googleTitle, { color: colors.text }]}>Choose an account</Text>
               <Text style={[styles.googleSubtitle, { color: colors.textSecondary }]}>
-                to continue to Vibhag
+                to continue to Splitmaro
               </Text>
             </View>
 
@@ -427,7 +427,7 @@ export default function LoginScreen() {
                   style={[styles.googleAccountItem, { borderBottomColor: colors.borderLight }]}
                   onPress={() => {
                     setShowGoogleModal(false);
-                    handleSocialAuth('google', 'dinesh.work@vibhag.com', 'Dinesh Work');
+                    handleSocialAuth('google', 'dinesh.work@splitmaro.com', 'Dinesh Work');
                   }}
                 >
                   <View style={[styles.googleAvatar, { backgroundColor: '#4ECDC4' }]}>
@@ -435,7 +435,7 @@ export default function LoginScreen() {
                   </View>
                   <View style={styles.googleAccountDetails}>
                     <Text style={[styles.googleAccountName, { color: colors.text }]}>Dinesh Work</Text>
-                    <Text style={[styles.googleAccountEmail, { color: colors.textSecondary }]}>dinesh.work@vibhag.com</Text>
+                    <Text style={[styles.googleAccountEmail, { color: colors.textSecondary }]}>dinesh.work@splitmaro.com</Text>
                   </View>
                   <Ionicons name="chevron-forward-outline" size={18} color={colors.textTertiary} />
                 </Pressable>
@@ -458,7 +458,7 @@ export default function LoginScreen() {
             )}
 
             <Text style={[styles.googleDisclaimer, { color: colors.textTertiary }]}>
-              To continue, Google will share your name, email address, language preference, and profile picture with Vibhag.
+              To continue, Google will share your name, email address, language preference, and profile picture with Splitmaro.
             </Text>
           </View>
         </View>
@@ -486,7 +486,7 @@ export default function LoginScreen() {
                 <View style={[styles.appleAccountCard, { backgroundColor: colors.surfaceSecondary }]}>
                   <View style={styles.appleAppInfo}>
                     <Text style={[styles.appleLabel, { color: colors.textSecondary }]}>App</Text>
-                    <Text style={[styles.appleValue, { color: colors.text }]}>Vibhag</Text>
+                    <Text style={[styles.appleValue, { color: colors.text }]}>Splitmaro</Text>
                   </View>
                   <View style={[styles.appleSeparator, { backgroundColor: colors.border }]} />
                   <View style={styles.appleAppInfo}>

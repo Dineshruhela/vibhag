@@ -16,7 +16,7 @@ export default function UpgradeScreen() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const price = 499;
-  const payeeVPA = 'vibhag@upi';
+  const payeeVPA = 'splitmaro@upi';
   const payeeName = 'dinesh kumar ruhela';
 
   const handleUpgrade = async () => {

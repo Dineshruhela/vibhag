@@ -1,5 +1,5 @@
 /**
- * Tab Layout for Vibhag
+ * Tab Layout for Splitmaro
  */
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useThemeColors } from '@/hooks/useThemeColor';

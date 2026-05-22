@@ -1,5 +1,5 @@
 /**
- * Vibhag Spacing & Layout System
+ * Splitmaro Spacing & Layout System
  */
 
 export const Spacing = {

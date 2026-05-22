@@ -1,5 +1,5 @@
 /**
- * Root Layout for Vibhag
+ * Root Layout for Splitmaro
  */
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
@@ -19,7 +19,7 @@ SplashScreen.preventAutoHideAsync().catch(() => {
   /* silencing error/warning when splash screen is not registered or already hidden */
 });
 
-const VibhagDarkTheme = {
+const SplitmaroDarkTheme = {
   ...DarkTheme,
   colors: {
     ...DarkTheme.colors,
@@ -32,7 +32,7 @@ const VibhagDarkTheme = {
   },
 };
 
-const VibhagLightTheme = {
+const SplitmaroLightTheme = {
   ...DefaultTheme,
   colors: {
     ...DefaultTheme.colors,
@@ -85,7 +85,7 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <ThemeProvider value={colorScheme === 'dark' ? VibhagDarkTheme : VibhagLightTheme}>
+      <ThemeProvider value={colorScheme === 'dark' ? SplitmaroDarkTheme : SplitmaroLightTheme}>
         <Stack
         screenOptions={{
           headerShown: false,

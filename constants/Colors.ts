@@ -1,5 +1,5 @@
 /**
- * Vibhag Design System Colors
+ * Splitmaro Design System Colors
  * Splitwise-inspired color palette with premium dark/light modes
  */
 

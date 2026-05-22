@@ -79,7 +79,7 @@ export default function GroupMembersScreen() {
             const shareAmount = Math.round((exp.amount * (val / 100)) * 100) / 100;
             newShares.push({ userId: selectedFriend.id, shareAmount });
             // Reduce others equally or proportionally (simplified: we just let the total shares exceed amount and Splitwise logic handles normalized % or we adjust others)
-            // For Vibhag, if shares don't match total exactly, we should ideally adjust others.
+            // For Splitmaro, if shares don't match total exactly, we should ideally adjust others.
             // Let's just adjust everyone else proportionally.
             const remaining = exp.amount - shareAmount;
             const originalTotal = exp.amount;

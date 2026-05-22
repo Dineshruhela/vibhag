@@ -1,5 +1,5 @@
 /**
- * Vibhag Database Layer - Online-Only Implementation
+ * Splitmaro Database Layer - Online-Only Implementation
  * Bypasses SQLite and calls Node.js/Express backend directly.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
