@@ -2,10 +2,11 @@
   "name": "splitmaro-landing",
   "version": "1.0.0",
   "description": "Splitmaro Product Landing Page",
+  "main": "server.js",
   "scripts": {
-    "start": "npx serve -s . -l $PORT"
+    "start": "node server.js"
   },
   "dependencies": {
-    "serve": "^14.2.4"
+    "express": "^4.19.2"
   }
 }
