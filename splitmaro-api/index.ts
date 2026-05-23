@@ -8,6 +8,7 @@ import express from 'express';
 import { OAuth2Client } from 'google-auth-library';
 import { createServer } from 'http';
 import jwt from 'jsonwebtoken';
+import path from 'path';
 import { Server } from 'socket.io';
 import { v4 as uuidv4 } from 'uuid';
 // @ts-ignore - apple-signin-auth has no types
@@ -33,6 +34,16 @@ const prisma = new PrismaClient();
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+
+app.get('/', (req, res) => {
+  const host = req.headers.host || '';
+  if (host.includes('api.dineshruhela.com')) {
+    return res.send('🚀 Splitmaro API is running successfully.');
+  }
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.use(express.static(path.join(__dirname, 'public')));
 
 // BigInt Serialization Fix for JSON
 (BigInt.prototype as any).toJSON = function () {

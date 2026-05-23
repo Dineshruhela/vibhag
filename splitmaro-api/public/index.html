@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Splitmaro — Split Expenses, Settle Instantly</title>
+  <meta name="description" content="The ultimate ad-free, fast, and secure expense sharing app for friends, roommates, and travel buddies. Settle instantly with UPI.">
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg-dark: #0A0D10;
+      --bg-card: rgba(22, 28, 36, 0.6);
+      --border-color: rgba(255, 255, 255, 0.08);
+      --primary: #8b5cf6;
+      --primary-glow: rgba(139, 92, 246, 0.15);
+      --secondary: #1cc29f;
+      --secondary-glow: rgba(28, 194, 159, 0.15);
+      --text-main: #F3F4F6;
+      --text-secondary: #9CA3AF;
+      --text-muted: #6B7280;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      scroll-behavior: smooth;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      overflow-x: hidden;
+      line-height: 1.6;
+    }
+
+    h1, h2, h3, .logo-text {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 700;
+    }
+
+    /* Background Gradients */
+    .glow-bg {
+      position: absolute;
+      width: 600px;
+      height: 600px;
+      border-radius: 50%;
+      filter: blur(150px);
+      z-index: 0;
+      pointer-events: none;
+      opacity: 0.4;
+    }
+
+    .glow-purple {
+      background: var(--primary);
+      top: -200px;
+      right: -100px;
+    }
+
+    .glow-teal {
+      background: var(--secondary);
+      bottom: 20%;
+      left: -200px;
+    }
+
+    /* Container */
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Header */
+    header {
+      padding: 24px 0;
+      border-bottom: 1px solid var(--border-color);
+      backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(10, 13, 16, 0.8);
+    }
+
+    .header-content {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+    }
+
+    .logo-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 20px rgba(139, 92, 246, 0.3);
+    }
+
+    .logo-icon svg {
+      width: 22px;
+      height: 22px;
+      fill: #fff;
+    }
+
+    .logo-text {
+      font-size: 24px;
+      background: linear-gradient(to right, #fff, #e0e0e0);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.5px;
+    }
+
+    nav {
+      display: flex;
+      align-items: center;
+      gap: 32px;
+    }
+
+    nav a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-weight: 500;
+      font-size: 15px;
+      transition: color 0.2s;
+    }
+
+    nav a:hover {
+      color: #fff;
+    }
+
+    .btn-nav {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 14px;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    .btn-nav:hover {
+      background: #fff;
+      color: var(--bg-dark);
+      transform: translateY(-1px);
+    }
+
+    /* Hero Section */
+    .hero {
+      padding: 100px 0 120px 0;
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 60px;
+      align-items: center;
+    }
+
+    .hero-text h1 {
+      font-size: 64px;
+      line-height: 1.1;
+      margin-bottom: 24px;
+      letter-spacing: -1.5px;
+      background: linear-gradient(135deg, #FFF 60%, #A5B4FC);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-text p {
+      font-size: 18px;
+      color: var(--text-secondary);
+      margin-bottom: 40px;
+      max-width: 540px;
+      font-weight: 400;
+    }
+
+    .hero-ctas {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary), #7c3aed);
+      color: #fff;
+      padding: 16px 32px;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 16px;
+      text-decoration: none;
+      box-shadow: 0 4px 30px rgba(139, 92, 246, 0.4);
+      transition: all 0.2s;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 35px rgba(139, 92, 246, 0.6);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-color);
+      color: #fff;
+      padding: 16px 32px;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 16px;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    /* Mockup */
+    .hero-mockup {
+      display: flex;
+      justify-content: center;
+      position: relative;
+    }
+
+    .device-frame {
+      width: 320px;
+      height: 640px;
+      background: #111418;
+      border: 10px solid #1f2937;
+      border-radius: 44px;
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.9), 
+                  0 0 0 1px rgba(255, 255, 255, 0.05),
+                  0 0 40px var(--primary-glow);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .device-notch {
+      width: 140px;
+      height: 24px;
+      background: #1f2937;
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      border-bottom-left-radius: 18px;
+      border-bottom-right-radius: 18px;
+      z-index: 10;
+    }
+
+    /* Mockup App Screen */
+    .app-screen {
+      padding: 44px 20px 20px 20px;
+      height: 100%;
+      background-color: #0F1419;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .app-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    .app-title {
+      font-size: 18px;
+      font-weight: 800;
+    }
+
+    .app-card {
+      background: linear-gradient(135deg, #1cc29f, #149c7f);
+      border-radius: 20px;
+      padding: 20px;
+      margin-bottom: 24px;
+      box-shadow: 0 8px 24px rgba(28, 194, 159, 0.25);
+    }
+
+    .card-label {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.8);
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
+    .card-balance {
+      font-size: 26px;
+      font-weight: 800;
+      margin: 4px 0 12px 0;
+      font-family: 'Outfit', sans-serif;
+    }
+
+    .card-row {
+      display: flex;
+      justify-content: space-between;
+      border-top: 1px solid rgba(255, 255, 255, 0.2);
+      padding-top: 12px;
+    }
+
+    .card-stat-val {
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .app-list-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .app-list-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-secondary);
+    }
+
+    .group-item {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .group-avatar {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      background: var(--primary-glow);
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    .group-info {
+      flex: 1;
+    }
+
+    .group-name {
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .group-members {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .group-bal-chip {
+      padding: 4px 8px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      background: rgba(28, 194, 159, 0.1);
+      color: var(--secondary);
+    }
+
+    .group-bal-chip.neg {
+      background: rgba(239, 68, 68, 0.1);
+      color: #ef4444;
+    }
+
+    /* Features Section */
+    .features {
+      padding: 100px 0;
+      border-top: 1px solid var(--border-color);
+    }
+
+    .section-title {
+      text-align: center;
+      margin-bottom: 60px;
+    }
+
+    .section-title h2 {
+      font-size: 44px;
+      letter-spacing: -1px;
+      margin-bottom: 16px;
+    }
+
+    .section-title p {
+      color: var(--text-secondary);
+      font-size: 18px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 30px;
+    }
+
+    .feature-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 40px 30px;
+      transition: all 0.3s;
+      cursor: default;
+    }
+
+    .feature-card:hover {
+      transform: translateY(-5px);
+      border-color: rgba(139, 92, 246, 0.3);
+      box-shadow: 0 10px 30px -10px rgba(139, 92, 246, 0.2);
+    }
+
+    .feature-icon-wrapper {
+      width: 56px;
+      height: 56px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 24px;
+      background: var(--primary-glow);
+    }
+
+    .feature-icon-wrapper svg {
+      width: 26px;
+      height: 26px;
+      stroke: var(--primary);
+    }
+
+    .feature-card.secondary-theme .feature-icon-wrapper {
+      background: var(--secondary-glow);
+    }
+
+    .feature-card.secondary-theme .feature-icon-wrapper svg {
+      stroke: var(--secondary);
+    }
+
+    .feature-card h3 {
+      font-size: 20px;
+      margin-bottom: 12px;
+      color: #fff;
+    }
+
+    .feature-card p {
+      color: var(--text-secondary);
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    /* Pro Plan Section */
+    .pro-section {
+      padding: 100px 0;
+      border-top: 1px solid var(--border-color);
+    }
+
+    .pro-card {
+      background: radial-gradient(circle at 100% 0%, rgba(139, 92, 246, 0.15) 0%, rgba(22, 28, 36, 0.7) 60%);
+      border: 1px solid rgba(139, 92, 246, 0.25);
+      border-radius: 32px;
+      padding: 60px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 60px;
+      align-items: center;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+    }
+
+    .pro-info h3 {
+      font-size: 36px;
+      margin-bottom: 16px;
+      background: linear-gradient(135deg, #fff, #c084fc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .pro-info p {
+      color: var(--text-secondary);
+      font-size: 16px;
+      margin-bottom: 30px;
+    }
+
+    .pro-features {
+      list-style: none;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .pro-features li {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      color: var(--text-main);
+      font-weight: 500;
+    }
+
+    .pro-features li svg {
+      width: 18px;
+      height: 18px;
+      stroke: var(--secondary);
+    }
+
+    .pro-pricing {
+      background: rgba(10, 13, 16, 0.5);
+      border: 1px solid var(--border-color);
+      border-radius: 24px;
+      padding: 40px;
+      text-align: center;
+    }
+
+    .pro-badge {
+      display: inline-block;
+      padding: 6px 12px;
+      background: var(--primary-glow);
+      color: #c084fc;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 20px;
+      border: 1px solid rgba(139, 92, 246, 0.2);
+    }
+
+    .pro-price {
+      font-size: 54px;
+      font-weight: 900;
+      color: #fff;
+      font-family: 'Outfit', sans-serif;
+      margin-bottom: 8px;
+    }
+
+    .pro-price span {
+      font-size: 18px;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .pro-pricing p {
+      color: var(--text-secondary);
+      font-size: 14px;
+      margin-bottom: 30px;
+    }
+
+    /* FAQ Section */
+    .faq {
+      padding: 100px 0;
+      border-top: 1px solid var(--border-color);
+    }
+
+    .faq-list {
+      max-width: 800px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .faq-item {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 24px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .faq-item:hover {
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    .faq-question {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 600;
+      font-size: 18px;
+      color: #fff;
+    }
+
+    .faq-toggle {
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.2s;
+    }
+
+    .faq-toggle svg {
+      width: 16px;
+      height: 16px;
+      stroke: var(--text-secondary);
+    }
+
+    .faq-answer {
+      margin-top: 12px;
+      color: var(--text-secondary);
+      font-size: 15px;
+      line-height: 1.6;
+      display: none;
+    }
+
+    .faq-item.active .faq-toggle {
+      transform: rotate(45deg);
+    }
+
+    .faq-item.active .faq-answer {
+      display: block;
+    }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--border-color);
+      padding: 60px 0 40px 0;
+      background: #06080A;
+    }
+
+    .footer-content {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 40px;
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 40px;
+    }
+
+    .footer-links a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 14px;
+      transition: color 0.2s;
+    }
+
+    .footer-links a:hover {
+      color: #fff;
+    }
+
+    .footer-bottom {
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      padding-top: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .footer-bottom p {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+      .hero {
+        grid-template-columns: 1fr;
+        text-align: center;
+        gap: 40px;
+      }
+      .hero-text p {
+        margin: 0 auto 40px auto;
+      }
+      .hero-ctas {
+        justify-content: center;
+      }
+      .features-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .pro-card {
+        grid-template-columns: 1fr;
+        padding: 40px;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .hero-text h1 {
+        font-size: 44px;
+      }
+      .features-grid {
+        grid-template-columns: 1fr;
+      }
+      .footer-content {
+        flex-direction: column;
+        gap: 30px;
+        text-align: center;
+      }
+      .footer-bottom {
+        flex-direction: column;
+        gap: 16px;
+        text-align: center;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="glow-bg glow-purple"></div>
+  <div class="glow-bg glow-teal"></div>
+
+  <!-- Header -->
+  <header>
+    <div class="container header-content">
+      <a href="#" class="logo">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="#FFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>
+        </div>
+        <span class="logo-text">Splitmaro</span>
+      </a>
+      <nav>
+        <a href="#features">Features</a>
+        <a href="#pro">Pro</a>
+        <a href="#faq">FAQ</a>
+        <a href="https://expo.dev/artifacts/eas/aY8dBRqNcD5iVs9P85uDJs.aab" class="btn-nav">Download App</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="container hero">
+    <div class="hero-text">
+      <h1>Split Expenses.<br>Settle Instantly.<br>No Stress.</h1>
+      <p>The ultimate ad-free, fast, and secure expense sharing app for friends, roommates, and travel buddies. Keep your group finances clean and transparent.</p>
+      <div class="hero-ctas">
+        <a href="https://expo.dev/artifacts/eas/aY8dBRqNcD5iVs9P85uDJs.aab" class="btn-primary">Download for Android</a>
+        <a href="https://expo.dev/artifacts/eas/vQ9i3DxT4DXDaUCMS1tEvp.ipa" class="btn-secondary">Download for iOS</a>
+      </div>
+    </div>
+    
+    <div class="hero-mockup">
+      <div class="device-frame">
+        <div class="device-notch"></div>
+        <div class="app-screen">
+          <div class="app-header">
+            <div class="app-title">Splitmaro</div>
+            <div style="width: 24px; height: 24px; border-radius: 50%; background: #1cc29f; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700;">U</div>
+          </div>
+          
+          <div class="app-card">
+            <div class="card-label">OVERALL BALANCE</div>
+            <div class="card-balance">₹2,450.00</div>
+            <div class="card-row">
+              <div>
+                <div class="card-label" style="font-size: 9px;">YOU ARE OWED</div>
+                <div class="card-stat-val">₹3,200.00</div>
+              </div>
+              <div style="text-align: right;">
+                <div class="card-label" style="font-size: 9px;">YOU OWE</div>
+                <div class="card-stat-val" style="color: rgba(255,255,255,0.7);">₹750.00</div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="app-list-header">
+            <div class="app-list-title">Active Groups</div>
+            <div class="app-list-title" style="color: var(--primary);">+ New</div>
+          </div>
+          
+          <div class="group-item">
+            <div class="group-avatar" style="background: rgba(139, 92, 246, 0.1); color: var(--primary);">✈️</div>
+            <div class="group-info">
+              <div class="group-name">Shared Trip 2026</div>
+              <div class="group-members">4 members</div>
+            </div>
+            <div class="group-bal-chip">You get ₹1,200</div>
+          </div>
+
+          <div class="group-item">
+            <div class="group-avatar" style="background: rgba(28, 194, 159, 0.1); color: var(--secondary);">🏡</div>
+            <div class="group-info">
+              <div class="group-name">Roomies Flat 4B</div>
+              <div class="group-members">3 members</div>
+            </div>
+            <div class="group-bal-chip">You get ₹1,250</div>
+          </div>
+
+          <div class="group-item">
+            <div class="group-avatar" style="background: rgba(239, 68, 68, 0.1); color: #ef4444;">🍔</div>
+            <div class="group-info">
+              <div class="group-name">Weekend Dinings</div>
+              <div class="group-members">5 members</div>
+            </div>
+            <div class="group-bal-chip neg">You owe ₹750</div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features Section -->
+  <section class="container features" id="features">
+    <div class="section-title">
+      <h2>Engineered for Simplicity</h2>
+      <p>All the features you need to track, split, and settle balances without the clutter of traditional apps.</p>
+    </div>
+    
+    <div class="features-grid">
+      <!-- Feature 1 -->
+      <div class="feature-card">
+        <div class="feature-icon-wrapper">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="5" width="20" height="14" rx="2" ry="2"/>
+            <line x1="2" y1="10" x2="22" y2="10"/>
+          </svg>
+        </div>
+        <h3>Instant UPI Settlement</h3>
+        <p>Settle your balances in one click. Splitmaro generates deep-linked UPI payments to open PhonePe, GPay, or Paytm directly with the exact amount prefilled.</p>
+      </div>
+
+      <!-- Feature 2 -->
+      <div class="feature-card secondary-theme">
+        <div class="feature-icon-wrapper">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+          </svg>
+        </div>
+        <h3>Auto Background Sync</h3>
+        <p>Record transactions on the go. Splitmaro is fully optimized for offline usage, securely cache-syncing all records to the database as soon as you go online.</p>
+      </div>
+
+      <!-- Feature 3 -->
+      <div class="feature-card">
+        <div class="feature-icon-wrapper">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="20" x2="18" y2="10"/>
+            <line x1="12" y1="20" x2="12" y2="4"/>
+            <line x1="6" y1="20" x2="6" y2="14"/>
+          </svg>
+        </div>
+        <h3>Smart Analytics</h3>
+        <p>Visualize spending habits easily. Get detailed breakdowns by category (food, travel, rent) and track group budget limits with dynamic alerts.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Pro Section -->
+  <section class="container pro-section" id="pro">
+    <div class="pro-card">
+      <div class="pro-info">
+        <div class="pro-badge">LIFETIME ACCESS</div>
+        <h3>Unlock Splitmaro Pro</h3>
+        <p>Get access to advanced power features to fully master your shared finances. No subscriptions, just a single one-time upgrade.</p>
+        
+        <ul class="pro-features">
+          <li>
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            Unlimited Groups
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            Recurring Bills & Rent
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            Detailed CSV Exports
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            Smart Budget Alerts
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            Multi-device Cloud Sync
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            Premium VIP Badging
+          </li>
+        </ul>
+      </div>
+      
+      <div class="pro-pricing">
+        <div class="pro-badge" style="background: rgba(28, 194, 159, 0.1); color: var(--secondary); border-color: rgba(28, 194, 159, 0.2);">ONE-TIME PURCHASE</div>
+        <div class="pro-price">₹499</div>
+        <p>Pay once, own forever. Clean, simple, transparent pricing.</p>
+        <a href="https://expo.dev/artifacts/eas/aY8dBRqNcD5iVs9P85uDJs.aab" class="btn-primary" style="display: block; width: 100%; text-align: center; margin-top: 10px;">Get Splitmaro Pro</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ Section -->
+  <section class="container faq" id="faq">
+    <div class="section-title">
+      <h2>Frequently Asked Questions</h2>
+    </div>
+    
+    <div class="faq-list">
+      <div class="faq-item">
+        <div class="faq-question">
+          <span>Is Splitmaro free to use?</span>
+          <div class="faq-toggle">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </div>
+        </div>
+        <div class="faq-answer">
+          Yes! The core features of Splitmaro are completely free. You can split bills, create groups, settle debts, and manage transactions without paying anything. There are no ads or hidden charges.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-question">
+          <span>How does the instant UPI Settlement work?</span>
+          <div class="faq-toggle">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </div>
+        </div>
+        <div class="faq-answer">
+          When you tap 'Settle' on a debt, Splitmaro reads the payee's UPI ID and generates a secure UPI deep-link containing the exact payment amount. This link launches your native UPI app (like GPay, PhonePe, or Paytm) on your phone directly, so you don't have to copy-paste amounts or enter phone numbers.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-question">
+          <span>Can I use Splitmaro offline?</span>
+          <div class="faq-toggle">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </div>
+        </div>
+        <div class="faq-answer">
+          Absolutely. Splitmaro has an offline-first design. All actions you perform are immediately written to your local database cache. Once your internet connection is active, Splitmaro runs a background sync to securely back up and reconcile all transactions.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-question">
+          <span>Is there a monthly subscription for Pro?</span>
+          <div class="faq-toggle">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </div>
+        </div>
+        <div class="faq-answer">
+          No! Splitmaro Pro is a one-time purchase of ₹499. Once you upgrade, you gain lifetime access to all premium features, including unlimited groups, recurring expenses, cloud sync, and budget alerts on all your devices.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container">
+      <div class="footer-content">
+        <a href="#" class="logo">
+          <div class="logo-icon">
+            <svg viewBox="0 0 24 24">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="#FFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            </svg>
+          </div>
+          <span class="logo-text">Splitmaro</span>
+        </a>
+        <div class="footer-links">
+          <a href="/policies.html">Legal & Policies</a>
+          <a href="/privacy.html?app=splitmaro">Privacy Policy</a>
+          <a href="/copyright.html">Copyright Info</a>
+        </div>
+      </div>
+      
+      <div class="footer-bottom">
+        <p>&copy; 2026 Dinesh Ruhela. All rights reserved.</p>
+        <p style="color: var(--text-muted);">Splitmaro is an independent app developed by Dinesh Ruhela.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // FAQ Toggle
+    const faqItems = document.querySelectorAll('.faq-item');
+    faqItems.forEach(item => {
+      item.addEventListener('click', () => {
+        item.classList.toggle('active');
+      });
+    });
+  </script>
+</body>
+</html>
