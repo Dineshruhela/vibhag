@@ -614,6 +614,8 @@ app.get('/api/sync/pull', authenticateToken as any, async (req: AuthRequest, res
       prisma.expenseShare.findMany({ where: { expense_id: { in: expenseIds } } }),
     ]);
 
+    const balanceData = await getOverallBalanceBackend(currentUserId);
+
     res.json({ 
       success: true, 
       data: { 
@@ -625,7 +627,8 @@ app.get('/api/sync/pull', authenticateToken as any, async (req: AuthRequest, res
         expenseShares, 
         settlements, 
         comments,
-        activeGroupIds: userGroupIds
+        activeGroupIds: userGroupIds,
+        balancesByUser: balanceData.balancesByUser
       } 
     });
   } catch (error) {
