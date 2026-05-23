@@ -16,7 +16,7 @@
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.dineshruhela.com",
         "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "73461724779-pem307ei4l6iv2ib9npqpkouo662p3v7.apps.googleusercontent.com",
-        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "REPLACE_WITH_IOS_CLIENT_ID",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "73461724779-cbv3g71eo7onj12foo61gs3u75cgc2ct.apps.googleusercontent.com",
         "EXPO_PUBLIC_RAZORPAY_KEY_ID": "rzp_test_SsW7RUkrC0hvGm"
       }
     },
@@ -25,7 +25,7 @@
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.dineshruhela.com",
         "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "73461724779-pem307ei4l6iv2ib9npqpkouo662p3v7.apps.googleusercontent.com",
-        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "REPLACE_WITH_IOS_CLIENT_ID",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "73461724779-cbv3g71eo7onj12foo61gs3u75cgc2ct.apps.googleusercontent.com",
         "EXPO_PUBLIC_RAZORPAY_KEY_ID": "rzp_test_SsW7RUkrC0hvGm"
       }
     }
