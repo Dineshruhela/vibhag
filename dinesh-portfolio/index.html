@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Dinesh Kumar Ruhela — Sr. JavaScript Developer & Project Leader</title>
+  <meta name="description" content="Portfolio of Dinesh Kumar Ruhela, a Senior JavaScript Developer and Project Leader with over 10 years of experience in React, Redux, Node.js, and PWAs.">
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg-dark: #080A10;
+      --bg-card: rgba(17, 22, 34, 0.6);
+      --border-color: rgba(255, 255, 255, 0.06);
+      --primary: #3b82f6;
+      --primary-glow: rgba(59, 130, 246, 0.15);
+      --accent: #8b5cf6;
+      --accent-glow: rgba(139, 92, 246, 0.15);
+      --success: #10b981;
+      --text-main: #F3F4F6;
+      --text-secondary: #9CA3AF;
+      --text-muted: #6B7280;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      scroll-behavior: smooth;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      overflow-x: hidden;
+      line-height: 1.7;
+    }
+
+    h1, h2, h3, h4, .nav-logo {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 700;
+    }
+
+    /* Glow Gradients */
+    .blur-glow {
+      position: absolute;
+      width: 500px;
+      height: 500px;
+      border-radius: 50%;
+      filter: blur(120px);
+      z-index: 0;
+      pointer-events: none;
+      opacity: 0.3;
+    }
+
+    .glow-1 {
+      background: var(--primary);
+      top: -100px;
+      right: -100px;
+    }
+
+    .glow-2 {
+      background: var(--accent);
+      bottom: 20%;
+      left: -150px;
+    }
+
+    /* Container */
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 24px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Navigation */
+    header {
+      padding: 20px 0;
+      border-bottom: 1px solid var(--border-color);
+      backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(8, 10, 16, 0.85);
+    }
+
+    .header-flex {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .nav-logo {
+      font-size: 22px;
+      text-decoration: none;
+      background: linear-gradient(to right, #fff, #9CA3AF);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.5px;
+    }
+
+    nav {
+      display: flex;
+      align-items: center;
+      gap: 32px;
+    }
+
+    nav a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-weight: 500;
+      font-size: 14px;
+      transition: color 0.2s;
+    }
+
+    nav a:hover {
+      color: #fff;
+    }
+
+    .btn-contact-nav {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-color);
+      color: #fff;
+      padding: 8px 18px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 13px;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    .btn-contact-nav:hover {
+      background: #fff;
+      color: var(--bg-dark);
+    }
+
+    /* Hero Section */
+    .hero {
+      padding: 120px 0 100px 0;
+      display: grid;
+      grid-template-columns: 1.3fr 0.7fr;
+      gap: 40px;
+      align-items: center;
+    }
+
+    .hero-info h2 {
+      font-size: 16px;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: 12px;
+    }
+
+    .hero-info h1 {
+      font-size: 56px;
+      line-height: 1.1;
+      margin-bottom: 20px;
+      letter-spacing: -1px;
+      background: linear-gradient(135deg, #FFF 70%, #9CA3AF);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-info p {
+      font-size: 18px;
+      color: var(--text-secondary);
+      margin-bottom: 36px;
+      max-width: 600px;
+    }
+
+    .hero-buttons {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary), #1d4ed8);
+      color: #fff;
+      padding: 14px 28px;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 15px;
+      text-decoration: none;
+      box-shadow: 0 4px 20px var(--primary-glow);
+      transition: all 0.2s;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 25px rgba(59, 130, 246, 0.4);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-color);
+      color: #fff;
+      padding: 14px 28px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 15px;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .profile-graphic {
+      display: flex;
+      justify-content: center;
+      position: relative;
+    }
+
+    .avatar-glowing {
+      width: 240px;
+      height: 240px;
+      border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%;
+      background: linear-gradient(45deg, var(--primary), var(--accent));
+      animation: morphing 10s infinite alternate;
+      box-shadow: 0 10px 40px var(--accent-glow);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .avatar-glowing svg {
+      width: 100px;
+      height: 100px;
+      fill: #fff;
+    }
+
+    @keyframes morphing {
+      0% { border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%; }
+      50% { border-radius: 50% 50% 30% 70% / 50% 60% 40% 60%; }
+      100% { border-radius: 60% 40% 60% 40% / 40% 50% 50% 60%; }
+    }
+
+    /* Section Styling */
+    section {
+      padding: 100px 0;
+      border-top: 1px solid var(--border-color);
+    }
+
+    .section-title {
+      margin-bottom: 60px;
+    }
+
+    .section-title h2 {
+      font-size: 36px;
+      letter-spacing: -0.5px;
+      margin-bottom: 12px;
+      color: #fff;
+    }
+
+    .section-title p {
+      color: var(--text-secondary);
+      font-size: 16px;
+    }
+
+    /* Experience Timeline */
+    .timeline {
+      position: relative;
+      max-width: 800px;
+      margin: 0 auto;
+      padding-left: 32px;
+      border-left: 2px solid var(--border-color);
+    }
+
+    .timeline-item {
+      position: relative;
+      margin-bottom: 60px;
+    }
+
+    .timeline-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .timeline-dot {
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background-color: var(--primary);
+      left: -40px;
+      top: 6px;
+      box-shadow: 0 0 10px var(--primary);
+    }
+
+    .timeline-item.leader .timeline-dot {
+      background-color: var(--accent);
+      box-shadow: 0 0 10px var(--accent);
+    }
+
+    .timeline-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .timeline-role {
+      font-size: 20px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .timeline-company {
+      font-size: 15px;
+      color: var(--primary);
+      font-weight: 600;
+      margin-top: 2px;
+    }
+
+    .timeline-item.leader .timeline-company {
+      color: var(--accent);
+    }
+
+    .timeline-date {
+      font-size: 13px;
+      color: var(--text-muted);
+      font-weight: 600;
+      background: rgba(255, 255, 255, 0.03);
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+    }
+
+    .timeline-desc {
+      color: var(--text-secondary);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    /* Skills Section */
+    .skills-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 40px;
+    }
+
+    @media (max-width: 768px) {
+      .skills-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .skills-category {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 30px;
+    }
+
+    .skills-category h3 {
+      font-size: 18px;
+      margin-bottom: 20px;
+      color: #fff;
+      border-left: 3px solid var(--primary);
+      padding-left: 10px;
+    }
+
+    .skills-category.accent-border h3 {
+      border-left-color: var(--accent);
+    }
+
+    .skills-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .skill-tag {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+
+    .skill-tag:hover {
+      border-color: var(--primary);
+      background: var(--primary-glow);
+      transform: scale(1.03);
+    }
+
+    .skills-category.accent-border .skill-tag:hover {
+      border-color: var(--accent);
+      background: var(--accent-glow);
+    }
+
+    /* Projects Grid */
+    .projects-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
+    }
+
+    @media (max-width: 768px) {
+      .projects-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .project-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 36px;
+      transition: all 0.3s;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .project-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(59, 130, 246, 0.3);
+      box-shadow: 0 12px 30px -10px var(--primary-glow);
+    }
+
+    .project-icon {
+      font-size: 32px;
+      margin-bottom: 20px;
+    }
+
+    .project-card h3 {
+      font-size: 22px;
+      margin-bottom: 12px;
+      color: #fff;
+    }
+
+    .project-card p {
+      color: var(--text-secondary);
+      font-size: 14px;
+      margin-bottom: 24px;
+      line-height: 1.6;
+      flex: 1;
+    }
+
+    .project-tech {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .tech-tag {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-color);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      color: var(--text-secondary);
+      font-weight: 600;
+    }
+
+    /* Contact Section */
+    .contact-card {
+      background: radial-gradient(circle at 100% 0%, var(--primary-glow) 0%, var(--bg-card) 60%);
+      border: 1px solid var(--border-color);
+      border-radius: 24px;
+      padding: 50px;
+      text-align: center;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .contact-card h3 {
+      font-size: 28px;
+      margin-bottom: 12px;
+      color: #fff;
+    }
+
+    .contact-card p {
+      color: var(--text-secondary);
+      font-size: 15px;
+      margin-bottom: 30px;
+    }
+
+    .contact-details {
+      display: flex;
+      justify-content: center;
+      gap: 40px;
+      margin-bottom: 36px;
+      flex-wrap: wrap;
+    }
+
+    .contact-info-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 15px;
+      color: var(--text-main);
+      font-weight: 500;
+      text-decoration: none;
+    }
+
+    .contact-info-item:hover {
+      color: var(--primary);
+    }
+
+    .contact-info-item svg {
+      width: 20px;
+      height: 20px;
+      stroke: var(--primary);
+    }
+
+    /* Footer */
+    footer {
+      padding: 40px 0;
+      border-top: 1px solid var(--border-color);
+      background: #040508;
+      text-align: center;
+    }
+
+    footer p {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    @media (max-width: 768px) {
+      .hero {
+        grid-template-columns: 1fr;
+        text-align: center;
+        padding-top: 60px;
+      }
+      .hero-info h1 {
+        font-size: 40px;
+      }
+      .hero-buttons {
+        justify-content: center;
+      }
+      .profile-graphic {
+        order: -1;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="blur-glow glow-1"></div>
+  <div class="blur-glow glow-2"></div>
+
+  <!-- Header -->
+  <header>
+    <div class="container header-flex">
+      <a href="#" class="nav-logo">Dinesh Ruhela</a>
+      <nav>
+        <a href="#experience">Experience</a>
+        <a href="#skills">Skills</a>
+        <a href="#projects">Projects</a>
+        <a href="mailto:dinesh.jony@gmail.com" class="btn-contact-nav">Email Me</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="container hero">
+    <div class="hero-info">
+      <h2>Hello, I'm Dinesh</h2>
+      <h1>Senior JavaScript Developer & Tech Leader</h1>
+      <p>With over 10 years of professional experience in designing, building, and deploying scalable web applications. Currently leading tech projects, specializing in React, Redux, PWAs, and Node.js.</p>
+      <div class="hero-buttons">
+        <a href="#projects" class="btn-primary">View Projects</a>
+        <a href="#experience" class="btn-secondary">My Experience</a>
+      </div>
+    </div>
+    
+    <div class="profile-graphic">
+      <div class="avatar-glowing">
+        <svg viewBox="0 0 24 24">
+          <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" fill="none" stroke="#FFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M16 14l-4-4-4 4" fill="none" stroke="#FFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="12" y1="10" x2="12" y2="18" stroke="#FFF" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <!-- Experience Section -->
+  <section id="experience">
+    <div class="container">
+      <div class="section-title">
+        <h2>Professional Journey</h2>
+        <p>A timeline of my professional roles and engineering leadership over the last decade.</p>
+      </div>
+      
+      <div class="timeline">
+        <!-- R Systems -->
+        <div class="timeline-item leader">
+          <div class="timeline-dot"></div>
+          <div class="timeline-header">
+            <div>
+              <div class="timeline-role">Project Leader</div>
+              <div class="timeline-company">R Systems Ltd.</div>
+            </div>
+            <div class="timeline-date">Nov 2021 – Present</div>
+          </div>
+          <div class="timeline-desc">
+            Directing frontend architectures and development teams. Managing data flow, performance optimization, and testing standards across multiple products.
+          </div>
+        </div>
+
+        <!-- Reliable E Solutions -->
+        <div class="timeline-item">
+          <div class="timeline-dot"></div>
+          <div class="timeline-header">
+            <div>
+              <div class="timeline-role">Sr. JavaScript Developer</div>
+              <div class="timeline-company">Reliable E Solutions P Ltd.</div>
+            </div>
+            <div class="timeline-date">Sep 2018 – Oct 2021</div>
+          </div>
+          <div class="timeline-desc">
+            Engineered modular frontend components, interactive design systems, and web apps utilizing modern JavaScript frameworks, React, and Redux.
+          </div>
+        </div>
+
+        <!-- Soron Systems -->
+        <div class="timeline-item">
+          <div class="timeline-dot"></div>
+          <div class="timeline-header">
+            <div>
+              <div class="timeline-role">Sr. Software Engineer</div>
+              <div class="timeline-company">Soron Systems Solutions P Ltd.</div>
+            </div>
+            <div class="timeline-date">Nov 2017 – Aug 2018</div>
+          </div>
+          <div class="timeline-desc">
+            Authored modular single-page applications, focusing on custom widgets, hybrid app shells, and responsive client layouts.
+          </div>
+        </div>
+
+        <!-- Ratna Sagar -->
+        <div class="timeline-item">
+          <div class="timeline-dot"></div>
+          <div class="timeline-header">
+            <div>
+              <div class="timeline-role">Developer</div>
+              <div class="timeline-company">Ratna Sagar Pvt. Ltd.</div>
+            </div>
+            <div class="timeline-date">Oct 2016 – Oct 2017</div>
+          </div>
+          <div class="timeline-desc">
+            Developed interactive e-learning modules, digital textbooks, and responsive educational tools.
+          </div>
+        </div>
+
+        <!-- CCRT -->
+        <div class="timeline-item">
+          <div class="timeline-dot"></div>
+          <div class="timeline-header">
+            <div>
+              <div class="timeline-role">Web Programmer</div>
+              <div class="timeline-company">Centre for Cultural Resources & Training</div>
+            </div>
+            <div class="timeline-date">Jan 2011 – Feb 2015</div>
+          </div>
+          <div class="timeline-desc">
+            Managed database configurations, developed web portals, and maintained official digital archives.
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Skills Section -->
+  <section id="skills">
+    <div class="container">
+      <div class="section-title">
+        <h2>Expertise & Skills</h2>
+        <p>Technologies, libraries, and frameworks I work with on a daily basis.</p>
+      </div>
+      
+      <div class="skills-grid">
+        <!-- Frontend -->
+        <div class="skills-category">
+          <h3>Frontend Technologies</h3>
+          <div class="skills-list">
+            <span class="skill-tag">React JS</span>
+            <span class="skill-tag">Redux</span>
+            <span class="skill-tag">Progressive Web Apps (PWA)</span>
+            <span class="skill-tag">JavaScript (ES6+)</span>
+            <span class="skill-tag">Angular 2/4</span>
+            <span class="skill-tag">HTML5 / CSS3</span>
+            <span class="skill-tag">SCSS / SASS</span>
+            <span class="skill-tag">jQuery</span>
+            <span class="skill-tag">Bootstrap</span>
+          </div>
+        </div>
+
+        <!-- Testing & Backend -->
+        <div class="skills-category accent-border">
+          <h3>Backend & Testing</h3>
+          <div class="skills-list">
+            <span class="skill-tag">Node.js</span>
+            <span class="skill-tag">Express.js</span>
+            <span class="skill-tag">React Testing Library</span>
+            <span class="skill-tag">Jest</span>
+            <span class="skill-tag">Enzyme</span>
+            <span class="skill-tag">MySQL</span>
+            <span class="skill-tag">PostgreSQL</span>
+            <span class="skill-tag">Prisma ORM</span>
+          </div>
+        </div>
+
+        <!-- Version Control & Ops -->
+        <div class="skills-category accent-border">
+          <h3>DevOps & Analytics</h3>
+          <div class="skills-list">
+            <span class="skill-tag">Git / GitHub</span>
+            <span class="skill-tag">GitLab CI/CD</span>
+            <span class="skill-tag">AWS CodeCommit</span>
+            <span class="skill-tag">Google Analytics</span>
+            <span class="skill-tag">VS Code</span>
+          </div>
+        </div>
+
+        <!-- Methodologies & Tools -->
+        <div class="skills-category">
+          <h3>Methodologies & Creative</h3>
+          <div class="skills-list">
+            <span class="skill-tag">Agile Development</span>
+            <span class="skill-tag">Scrum Leadership</span>
+            <span class="skill-tag">Photoshop Design</span>
+            <span class="skill-tag">UI/UX Layouts</span>
+            <span class="skill-tag">Performance Tuning</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Projects Section -->
+  <section id="projects">
+    <div class="container">
+      <div class="section-title">
+        <h2>Key Projects</h2>
+        <p>Selected engineering highlights and products I have successfully built or led.</p>
+      </div>
+      
+      <div class="projects-grid">
+        <!-- Project 1 -->
+        <div class="project-card">
+          <div class="project-icon">💧</div>
+          <h3>CCW-PWA App</h3>
+          <p>Acted as Senior JavaScript Developer for a water IoT device progressive web application. Designed and built the React/Redux frontend interface and implemented secure, encrypted local caching databases for seamless offline metrics recording.</p>
+          <div class="project-tech">
+            <span class="tech-tag">React JS</span>
+            <span class="tech-tag">Redux</span>
+            <span class="tech-tag">PWA</span>
+            <span class="tech-tag">Local Storage</span>
+          </div>
+        </div>
+
+        <!-- Project 2 -->
+        <div class="project-card">
+          <div class="project-icon">🎨</div>
+          <h3>Designhill Studio</h3>
+          <p>Led a frontend engineering team of 3 developers to build an online, vector-based DIY graphic designing tool from scratch using React, Redux, Canvas APIs, and complex state management.</p>
+          <div class="project-tech">
+            <span class="tech-tag">React</span>
+            <span class="tech-tag">Redux</span>
+            <span class="tech-tag">Team Leadership</span>
+            <span class="tech-tag">Canvas API</span>
+          </div>
+        </div>
+
+        <!-- Project 3 -->
+        <div class="project-card">
+          <div class="project-icon">🏷️</div>
+          <h3>Designhill Logomaker</h3>
+          <p>Developed interactive add-on features and modules for an automated logo generator, enabling animated logos, business card customization flows, and print-ready vector downloads.</p>
+          <div class="project-tech">
+            <span class="tech-tag">JavaScript</span>
+            <span class="tech-tag">CSS Animations</span>
+            <span class="tech-tag">SVG Rendering</span>
+          </div>
+        </div>
+
+        <!-- Project 4 -->
+        <div class="project-card">
+          <div class="project-icon">🎬</div>
+          <h3>Eduglory</h3>
+          <p>Developed a high-performance video rental hybrid mobile application using Angular 4 and a PHP/Laravel API backend. Integrated custom media players and secure user authentication.</p>
+          <div class="project-tech">
+            <span class="tech-tag">Angular 4</span>
+            <span class="tech-tag">Ionic / Cordova</span>
+            <span class="tech-tag">PHP</span>
+            <span class="tech-tag">Video SDK</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Contact Card -->
+  <section id="contact" style="border-bottom: none;">
+    <div class="container">
+      <div class="contact-card">
+        <h3>Let's Collaborate</h3>
+        <p>I am always open to discussing new technical projects, frontend architecture reviews, or leadership opportunities.</p>
+        
+        <div class="contact-details">
+          <a href="mailto:dinesh.jony@gmail.com" class="contact-info-item">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+            dinesh.jony@gmail.com
+          </a>
+          <a href="tel:+918860660272" class="contact-info-item">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.94.725l.548 2.2a1 1 0 01-.321.988l-1.305.98a10.582 10.582 0 004.872 4.872l.98-1.305a1 1 0 01.988-.321l2.2.548a1 1 0 01.725.94V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+            +91-8860660272
+          </a>
+          <div class="contact-info-item" style="pointer-events: none;">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            Delhi, India
+          </div>
+        </div>
+        
+        <a href="mailto:dinesh.jony@gmail.com" class="btn-primary">Get In Touch</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container">
+      <p>&copy; 2026 Dinesh Kumar Ruhela. All rights reserved.</p>
+    </div>
+  </footer>
+
+</body>
+</html>

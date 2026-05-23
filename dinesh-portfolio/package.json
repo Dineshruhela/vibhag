@@ -1,0 +1,11 @@
+{
+  "name": "dinesh-portfolio",
+  "version": "1.0.0",
+  "description": "Dinesh Kumar Ruhela - Professional Portfolio",
+  "scripts": {
+    "start": "npx serve -s . -l $PORT"
+  },
+  "dependencies": {
+    "serve": "^14.2.4"
+  }
+}
