@@ -12,10 +12,20 @@
       }
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.dineshruhela.com",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "73461724779-pem307ei4l6iv2ib9npqpkouo662p3v7.apps.googleusercontent.com",
+        "EXPO_PUBLIC_RAZORPAY_KEY_ID": "rzp_test_SsW7RUkrC0hvGm"
+      }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.dineshruhela.com",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "73461724779-pem307ei4l6iv2ib9npqpkouo662p3v7.apps.googleusercontent.com",
+        "EXPO_PUBLIC_RAZORPAY_KEY_ID": "rzp_test_SsW7RUkrC0hvGm"
+      }
     }
   },
   "submit": {
