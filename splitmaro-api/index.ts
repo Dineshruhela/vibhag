@@ -1936,7 +1936,8 @@ const checkoutHtmlTemplate = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;">
   <title>Splitmaro Pro Checkout</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2233,6 +2234,7 @@ const checkoutHtmlTemplate = `<!DOCTYPE html>
     const keyId = "<%= keyId %>";
     const userName = "<%= name %>";
     const userEmail = "<%= email %>";
+    const apiBase = "<%= apiBase %>";
     
     const payBtn = document.getElementById('pay-btn');
     const statusText = document.getElementById('status-text');
@@ -2249,7 +2251,7 @@ const checkoutHtmlTemplate = `<!DOCTYPE html>
       setStatus('Initializing transaction...', 'info');
       
       try {
-        const orderRes = await fetch('/api/create-order', {
+        const orderRes = await fetch(apiBase + '/api/create-order', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -2329,7 +2331,7 @@ const checkoutHtmlTemplate = `<!DOCTYPE html>
     
     async function verifyPayment(paymentDetails) {
       try {
-        const verifyRes = await fetch('/api/verify-payment', {
+        const verifyRes = await fetch(apiBase + '/api/verify-payment', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -2390,11 +2392,18 @@ app.get('/api/payment/checkout', async (req, res) => {
     const escapedName = JSON.stringify(user.name || '').slice(1, -1);
     const escapedEmail = JSON.stringify(user.email || 'customer@splitmaro.com').slice(1, -1);
 
+    // Derive API base URL from the incoming request so checkout page fetches hit the right server
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+    const host = req.headers['x-forwarded-host'] || req.get('host') || 'localhost:3000';
+    const apiBaseUrl = `${protocol}://${host}`;
+    const escapedApiBase = JSON.stringify(apiBaseUrl).slice(1, -1);
+
     const html = checkoutHtmlTemplate
       .replace('<%= token %>', escapedToken)
       .replace('<%= keyId %>', escapedKeyId)
       .replace('<%= name %>', escapedName)
-      .replace('<%= email %>', escapedEmail);
+      .replace('<%= email %>', escapedEmail)
+      .replace('<%= apiBase %>', escapedApiBase);
 
     res.send(html);
   } catch (error) {
