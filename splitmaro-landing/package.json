@@ -1,0 +1,11 @@
+{
+  "name": "splitmaro-landing",
+  "version": "1.0.0",
+  "description": "Splitmaro Product Landing Page",
+  "scripts": {
+    "start": "npx serve -s . -l $PORT"
+  },
+  "dependencies": {
+    "serve": "^14.2.4"
+  }
+}
