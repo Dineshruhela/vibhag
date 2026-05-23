@@ -174,13 +174,23 @@ app.post('/auth/social', async (req, res) => {
     if (provider === 'google') {
       // Verify Google ID token
       const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
-      if (!GOOGLE_CLIENT_ID) {
+      const GOOGLE_IOS_CLIENT_ID = process.env.GOOGLE_IOS_CLIENT_ID;
+      const GOOGLE_ANDROID_CLIENT_ID = process.env.GOOGLE_ANDROID_CLIENT_ID;
+
+      const allowedAudiences = [
+        GOOGLE_CLIENT_ID,
+        GOOGLE_IOS_CLIENT_ID,
+        GOOGLE_ANDROID_CLIENT_ID
+      ].filter((id): id is string => !!id);
+
+      if (allowedAudiences.length === 0) {
         return res.status(500).json({ error: 'Google Client ID not configured on server' });
       }
-      const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
+
+      const googleClient = new OAuth2Client(allowedAudiences[0]);
       const ticket = await googleClient.verifyIdToken({
         idToken,
-        audience: GOOGLE_CLIENT_ID,
+        audience: allowedAudiences,
       });
       const payload = ticket.getPayload();
       if (!payload || !payload.email) {
