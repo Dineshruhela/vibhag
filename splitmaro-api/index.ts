@@ -2228,6 +2228,52 @@ app.post('/api/admin/config', authenticateToken as any, async (req: AuthRequest,
   }
 });
 
+app.get('/api/admin/stats', authenticateToken as any, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user.userId;
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user || user.is_admin !== 1) {
+      return res.status(403).json({ error: 'Access denied: Admin privileges required' });
+    }
+
+    const totalUsers = await prisma.user.count();
+    const proUsers = await prisma.user.count({ where: { is_pro: 1 } });
+    const totalReferrals = await prisma.user.count({ where: { NOT: { referred_by: null } } });
+
+    const purchases = await prisma.purchase.findMany({
+      orderBy: { created_at: 'desc' },
+      include: {
+        user: {
+          select: {
+            name: true,
+            email: true,
+            avatar_color: true
+          }
+        }
+      }
+    });
+
+    const totalRevenue = purchases
+      .filter(p => p.status === 'success')
+      .reduce((sum, p) => sum + p.amount, 0);
+
+    res.json({
+      totalUsers,
+      proUsers,
+      totalReferrals,
+      totalRevenue,
+      purchases: purchases.map(p => ({
+        ...p,
+        created_at: Number(p.created_at),
+        updated_at: p.updated_at ? Number(p.updated_at) : null
+      }))
+    });
+  } catch (error) {
+    console.error('[Admin Stats] Error fetching stats:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
 app.post('/api/create-order', authenticateToken as any, async (req: AuthRequest, res) => {
   try {
     const { amount, currency, receipt } = req.body;

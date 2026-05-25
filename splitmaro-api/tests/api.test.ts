@@ -403,5 +403,37 @@ describe('Splitmaro API Integration Tests', () => {
       expect(configRes.body.amount).toBe(799);
       expect(configRes.body.currency).toBe('EUR');
     });
+
+    test('should prevent standard users from retrieving admin statistics', async () => {
+      const normalSignup = await request(API_URL)
+        .post('/auth/signup')
+        .send({
+          name: 'Regular Jane',
+          email: `jane-${Date.now()}@example.com`,
+          password: 'password123'
+        });
+
+      const normalToken = normalSignup.body.token;
+
+      const statsRes = await request(API_URL)
+        .get('/api/admin/stats')
+        .set('Authorization', `Bearer ${normalToken}`);
+
+      expect(statsRes.status).toBe(403);
+      expect(statsRes.body.error).toContain('Access denied');
+    });
+
+    test('should allow authenticated admin to successfully retrieve system statistics', async () => {
+      const statsRes = await request(API_URL)
+        .get('/api/admin/stats')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(statsRes.status).toBe(200);
+      expect(statsRes.body.totalUsers).toBeDefined();
+      expect(statsRes.body.proUsers).toBeDefined();
+      expect(statsRes.body.totalRevenue).toBeDefined();
+      expect(statsRes.body.purchases).toBeDefined();
+      expect(Array.isArray(statsRes.body.purchases)).toBe(true);
+    });
   });
 });
