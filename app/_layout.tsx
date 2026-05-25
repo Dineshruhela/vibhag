@@ -15,6 +15,7 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors } from '@/constants/Colors';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useSync } from '@/hooks/useSync';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync().catch(() => {
@@ -72,6 +73,16 @@ export default function RootLayout() {
         const groupId = parsed.path.replace(/^\//, '');
         if (groupId) router.push(`/join/${groupId}` as any);
       }
+
+      if (parsed.hostname === 'referral' && parsed.path) {
+        const referrerId = parsed.path.replace(/^\//, '');
+        if (referrerId) {
+          console.log('[DeepLink] Captured referral code from link:', referrerId);
+          AsyncStorage.setItem('pending_referral_code', referrerId).catch(err => {
+            console.error('[DeepLink] Failed to store referral code:', err);
+          });
+        }
+      }
     };
 
     // Handle link that opened the app from cold start
@@ -121,6 +132,14 @@ export default function RootLayout() {
           }}
         />
         <Stack.Screen
+          name="group/invite"
+          options={{
+            presentation: 'modal',
+            headerShown: false,
+            animation: 'slide_from_bottom',
+          }}
+        />
+        <Stack.Screen
           name="group/add-expense"
           options={{
             presentation: 'modal',
@@ -162,6 +181,14 @@ export default function RootLayout() {
         />
         <Stack.Screen
           name="auth/login"
+          options={{
+            presentation: 'modal',
+            headerShown: false,
+            animation: 'slide_from_bottom',
+          }}
+        />
+        <Stack.Screen
+          name="pro/referrals"
           options={{
             presentation: 'modal',
             headerShown: false,

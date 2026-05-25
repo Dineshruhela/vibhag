@@ -61,6 +61,7 @@ export default function LoginScreen() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [referralCode, setReferralCode] = useState('');
   const [loading, setLoading] = useState(false);
 
   // Apple availability (iOS only)
@@ -74,6 +75,17 @@ export default function LoginScreen() {
     }
   }, []);
 
+  useEffect(() => {
+    AsyncStorage.getItem('pending_referral_code')
+      .then(code => {
+        if (code) {
+          console.log('[LoginScreen] Loaded pending referral code:', code);
+          setReferralCode(code);
+        }
+      })
+      .catch(err => console.warn('[LoginScreen] Failed to load pending referral code:', err));
+  }, []);
+
   // Handle social auth result from backend
   async function handleSocialResult(result: any) {
     if (!result || !result.token || !result.user) {
@@ -83,6 +95,7 @@ export default function LoginScreen() {
     await api.setToken(result.token);
     await setupLocalUserFromAuth(result.user);
     await AsyncStorage.removeItem('last_sync_timestamp');
+    await AsyncStorage.removeItem('pending_referral_code');
     DeviceEventEmitter.emit('auth_change');
     router.replace('/(tabs)');
   }
@@ -111,6 +124,7 @@ export default function LoginScreen() {
         idToken,
         provider: 'google',
         avatar_color: '#' + Math.floor(Math.random() * 16777215).toString(16),
+        referralCode: referralCode.trim() || undefined,
       });
 
       await handleSocialResult(result);
@@ -165,6 +179,7 @@ export default function LoginScreen() {
         provider: 'apple',
         fullName: fullName || undefined,
         avatar_color: '#' + Math.floor(Math.random() * 16777215).toString(16),
+        referralCode: referralCode.trim() || undefined,
       });
 
       await handleSocialResult(result);
@@ -198,7 +213,7 @@ export default function LoginScreen() {
       if (isLogin) {
         result = await api.login({ email, password });
       } else {
-        result = await api.signup({ name, email, password });
+        result = await api.signup({ name, email, password, referralCode: referralCode.trim() || undefined });
       }
 
       await handleSocialResult(result);
@@ -354,6 +369,20 @@ export default function LoginScreen() {
                         autoCapitalize={'none'}
                       />
                     </View>
+
+                    {!isLogin && (
+                      <View style={[styles.inputContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                        <Ionicons name="gift-outline" size={20} color={colors.textSecondary} style={styles.inputIcon} />
+                        <TextInput
+                          style={[styles.input, { color: colors.text }]}
+                          onChangeText={setReferralCode}
+                          value={referralCode}
+                          placeholder="Referral Code (Optional)"
+                          placeholderTextColor={colors.textTertiary}
+                          autoCapitalize={'none'}
+                        />
+                      </View>
+                    )}
 
                     <Pressable
                       style={[styles.btn, { backgroundColor: colors.primary, opacity: loading ? 0.7 : 1 }]}

@@ -165,16 +165,13 @@ export default function GroupDetailScreen() {
     }
   };
 
-  const handleInvite = async () => {
+  const handleInvite = () => {
     if (!group) return;
     Haptics.selectionAsync();
-    const link = `splitmaro://join/${group.id}`;
-    const message = `Hey! Join my "${group.name}" group on Splitmaro to track shared expenses.\n\nTap to join: ${link}`;
-    try {
-      await Share.share({ message, title: `Join ${group.name} on Splitmaro` });
-    } catch (e) {
-      console.error(e);
-    }
+    router.push({
+      pathname: '/group/invite' as any,
+      params: { groupId: group.id }
+    });
   };
 
   if (!group) return <View style={[styles.root, { backgroundColor: colors.background }]} />;

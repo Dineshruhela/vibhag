@@ -6,6 +6,33 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AvatarColors } from '../constants/Colors';
 import { api, apiRequest } from './api';
 
+const getApiUrl = () => {
+  let url = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+  if (url.startsWith('"') && url.endsWith('"')) {
+    url = url.slice(1, -1);
+  }
+  return url;
+};
+
+export function formatReceiptUri(uri: string | null): string | null {
+  if (!uri) return null;
+  if (uri.startsWith('/uploads/')) {
+    return `${getApiUrl()}${uri}`;
+  }
+  return uri;
+}
+
+export async function uploadReceiptImage(base64: string, filename: string): Promise<string> {
+  const result = await apiRequest('/api/upload', {
+    method: 'POST',
+    body: JSON.stringify({ base64, name: filename })
+  });
+  if (!result || !result.url) {
+    throw new Error('Failed to upload image: No URL returned from server');
+  }
+  return result.url;
+}
+
 export async function getDatabase(): Promise<any> {
   return null;
 }
@@ -415,7 +442,7 @@ export async function getGroupExpenses(groupId: string): Promise<Expense[]> {
       currency: e.currency || 'INR',
       category: e.category || 'general',
       split_type: e.split_type || 'equal',
-      receipt_uri: e.receipt_uri ?? null,
+      receipt_uri: formatReceiptUri(e.receipt_uri ?? null),
       created_by: e.created_by,
       recurring_type: e.recurring_type ?? null,
       recurring_last_generated: e.recurring_last_generated ? Number(e.recurring_last_generated) : null,
@@ -444,7 +471,7 @@ export async function getAllExpenses(): Promise<Expense[]> {
       currency: e.currency || 'INR',
       category: e.category || 'general',
       split_type: e.split_type || 'equal',
-      receipt_uri: e.receipt_uri ?? null,
+      receipt_uri: formatReceiptUri(e.receipt_uri ?? null),
       created_by: e.created_by,
       recurring_type: e.recurring_type ?? null,
       recurring_last_generated: e.recurring_last_generated ? Number(e.recurring_last_generated) : null,
@@ -473,7 +500,7 @@ export async function getExpense(id: string): Promise<Expense | null> {
       currency: e.currency || 'INR',
       category: e.category || 'general',
       split_type: e.split_type || 'equal',
-      receipt_uri: e.receipt_uri ?? null,
+      receipt_uri: formatReceiptUri(e.receipt_uri ?? null),
       created_by: e.created_by,
       recurring_type: e.recurring_type ?? null,
       recurring_last_generated: e.recurring_last_generated ? Number(e.recurring_last_generated) : null,

@@ -69,6 +69,7 @@ export const api = {
     fullName?: string | null;
     avatar_color?: string;
     push_token?: string;
+    referralCode?: string;
   }) => apiRequest('/auth/social', { method: 'POST', body: JSON.stringify(data) }),
   push: (data: any) => apiRequest('/api/sync/push', { method: 'POST', body: JSON.stringify(data) }),
   pull: (lastSync: number) => apiRequest(`/api/sync/pull?lastSync=${lastSync}`),

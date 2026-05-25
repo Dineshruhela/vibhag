@@ -12,7 +12,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { createExpense, getCurrentUser, getGroupMembers, type User } from '../../lib/database';
+import { createExpense, getCurrentUser, getGroupMembers, uploadReceiptImage, type User } from '../../lib/database';
 
 const categories = Object.entries(CategoryColors);
 
@@ -30,8 +30,11 @@ export default function AddExpenseScreen() {
   const [splitType] = useState<'equal'>('equal');
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
+  const [savingMessage, setSavingMessage] = useState('Saving...');
   const [notes, setNotes] = useState('');
   const [receiptUri, setReceiptUri] = useState<string | null>(null);
+  const [receiptBase64, setReceiptBase64] = useState<string | null>(null);
+  const [receiptName, setReceiptName] = useState<string | null>(null);
   const [recurringType, setRecurringType] = useState<'none' | 'weekly' | 'monthly' | 'yearly'>('none');
 
   useEffect(() => {
@@ -56,10 +59,14 @@ export default function AddExpenseScreen() {
       allowsEditing: true,
       aspect: [4, 3],
       quality: 0.5, // compress for quicker upload
+      base64: true,
     });
 
     if (!result.canceled) {
       setReceiptUri(result.assets[0].uri);
+      setReceiptBase64(result.assets[0].base64 || null);
+      const filename = result.assets[0].uri.split('/').pop() || 'receipt.jpg';
+      setReceiptName(filename);
     }
   };
 
@@ -78,6 +85,31 @@ export default function AddExpenseScreen() {
       }
       const shareAmt = Math.round((amt / included.length) * 100) / 100;
 
+      let uploadedUrl: string | undefined = undefined;
+      if (receiptUri && receiptBase64 && receiptName) {
+        setSavingMessage('Uploading receipt...');
+        try {
+          uploadedUrl = await uploadReceiptImage(receiptBase64, receiptName);
+        } catch (uploadErr) {
+          console.warn('[AddExpense] Image upload failed:', uploadErr);
+          const proceed = await new Promise<boolean>((resolve) => {
+            Alert.alert(
+              'Upload Failed',
+              'Failed to upload receipt photo. Save expense without photo?',
+              [
+                { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+                { text: 'Save Without Photo', style: 'default', onPress: () => resolve(true) }
+              ]
+            );
+          });
+          if (!proceed) {
+            setSaving(false);
+            return;
+          }
+        }
+      }
+
+      setSavingMessage('Saving expense...');
       await createExpense({
         groupId: groupId!,
         description: desc.trim(),
@@ -90,7 +122,7 @@ export default function AddExpenseScreen() {
         recurringType,
         isRecurringParent: recurringType !== 'none',
         notes: notes.trim() || undefined,
-        receiptUri: receiptUri || undefined,
+        receiptUri: uploadedUrl || undefined,
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       // Push immediately so other members see the expense without waiting for AppState foreground
@@ -102,6 +134,7 @@ export default function AddExpenseScreen() {
       console.error(e);
     } finally {
       setSaving(false);
+      setSavingMessage('Saving...');
     }
   };
 
@@ -115,7 +148,7 @@ export default function AddExpenseScreen() {
           </Pressable>
           <Text style={[styles.headerTitle, { color: colors.text }]}>Add Expense</Text>
           <Pressable onPress={handleSave} disabled={saving} style={[styles.saveBtn, { backgroundColor: colors.primary, opacity: saving ? 0.6 : 1 }]}>
-            <Text style={styles.saveBtnText}>{saving ? 'Saving...' : 'Save'}</Text>
+            <Text style={styles.saveBtnText}>{saving ? savingMessage : 'Save'}</Text>
           </Pressable>
         </View>
 

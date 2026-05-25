@@ -9,7 +9,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { getCurrentUser, getExpense, getExpensePayers, getGroupMembers, updateExpense, type User } from '../../../lib/database';
+import { getCurrentUser, getExpense, getExpensePayers, getGroupMembers, updateExpense, uploadReceiptImage, type User } from '../../../lib/database';
 
 const categories = Object.entries(CategoryColors);
 
@@ -23,6 +23,8 @@ export default function EditExpenseScreen() {
   const [currency, setCurrency] = useState('INR');
   const [notes, setNotes] = useState('');
   const [receiptUri, setReceiptUri] = useState<string | null>(null);
+  const [receiptBase64, setReceiptBase64] = useState<string | null>(null);
+  const [receiptName, setReceiptName] = useState<string | null>(null);
   const [category, setCategory] = useState('general');
   const [recurringType, setRecurringType] = useState<string>('none');
   const [isRecurringParent, setIsRecurringParent] = useState(false);
@@ -31,6 +33,7 @@ export default function EditExpenseScreen() {
   const [paidBy, setPaidBy] = useState<string>('');
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
+  const [savingMessage, setSavingMessage] = useState('Saving...');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -85,10 +88,14 @@ export default function EditExpenseScreen() {
       allowsEditing: true,
       aspect: [4, 3],
       quality: 0.5,
+      base64: true,
     });
 
     if (!result.canceled) {
       setReceiptUri(result.assets[0].uri);
+      setReceiptBase64(result.assets[0].base64 || null);
+      const filename = result.assets[0].uri.split('/').pop() || 'receipt.jpg';
+      setReceiptName(filename);
     }
   };
 
@@ -123,6 +130,33 @@ export default function EditExpenseScreen() {
       const included = members.filter(m => !excluded.has(m.id));
       const shareAmt = Math.round((amt / included.length) * 100) / 100;
 
+      let uploadedUrl: string | undefined = undefined;
+      // Only upload if receiptUri is set and has base64 data (meaning a new file was picked)
+      // Otherwise, keep the existing remote URL or null if removed.
+      if (receiptUri && receiptBase64 && receiptName) {
+        setSavingMessage('Uploading receipt...');
+        try {
+          uploadedUrl = await uploadReceiptImage(receiptBase64, receiptName);
+        } catch (uploadErr) {
+          console.warn('[EditExpense] Image upload failed:', uploadErr);
+          const proceed = await new Promise<boolean>((resolve) => {
+            Alert.alert(
+              'Upload Failed',
+              'Failed to upload receipt photo. Save changes without photo?',
+              [
+                { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+                { text: 'Save Without Photo', style: 'default', onPress: () => resolve(true) }
+              ]
+            );
+          });
+          if (!proceed) {
+            setSaving(false);
+            return;
+          }
+        }
+      }
+
+      setSavingMessage('Saving changes...');
       await updateExpense(id!, {
         groupId,
         description: desc.trim(),
@@ -130,7 +164,9 @@ export default function EditExpenseScreen() {
         currency,
         category,
         notes: notes.trim() || undefined,
-        receiptUri: receiptUri,
+        // If uploadedUrl is set, save that URL. If receiptUri is null, clear the receipt.
+        // Otherwise, keep the original remote URI.
+        receiptUri: uploadedUrl !== undefined ? uploadedUrl : (receiptUri || null),
         recurringType: recurringType as 'none' | 'weekly' | 'monthly' | 'yearly',
         isRecurringParent: isRecurringParent,
         payers: [{ userId: paidBy, amount: amt }],
@@ -143,6 +179,7 @@ export default function EditExpenseScreen() {
       Alert.alert('Error', 'Failed to update expense.');
     } finally {
       setSaving(false);
+      setSavingMessage('Saving...');
     }
   };
 
@@ -157,7 +194,7 @@ export default function EditExpenseScreen() {
           </Pressable>
           <Text style={[styles.headerTitle, { color: colors.text }]}>Edit Expense</Text>
           <Pressable onPress={handleSave} disabled={saving} style={[styles.saveBtn, { backgroundColor: colors.primary, opacity: saving ? 0.6 : 1 }]}>
-            <Text style={styles.saveBtnText}>{saving ? 'Saving...' : 'Save'}</Text>
+            <Text style={styles.saveBtnText}>{saving ? savingMessage : 'Save'}</Text>
           </Pressable>
         </View>
 

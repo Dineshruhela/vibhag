@@ -5,6 +5,7 @@ import cors from 'cors';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
 import express from 'express';
+import fs from 'fs';
 import { OAuth2Client } from 'google-auth-library';
 import { createServer } from 'http';
 import jwt from 'jsonwebtoken';
@@ -79,6 +80,44 @@ async function sendPushNotification(userId: string, title: string, body: string,
   }
 }
 
+async function checkReferralReward(referrerId: string) {
+  try {
+    const count = await prisma.user.count({
+      where: { referred_by: referrerId }
+    });
+    if (count >= 3) {
+      const user = await prisma.user.findUnique({ where: { id: referrerId } });
+      if (user && user.is_pro === 0) {
+        await prisma.user.update({
+          where: { id: referrerId },
+          data: {
+            is_pro: 1,
+            updated_at: BigInt(Date.now())
+          }
+        });
+
+        await prisma.purchase.create({
+          data: {
+            id: uuidv4(),
+            user_id: referrerId,
+            amount: 0,
+            currency: 'INR',
+            status: 'success',
+            provider: 'referral',
+            created_at: BigInt(Date.now()),
+            updated_at: BigInt(Date.now())
+          }
+        });
+
+        console.log(`[Referral] Referrer ${referrerId} reached ${count} referrals. Automatically upgraded to Pro!`);
+        sendPushNotification(referrerId, 'Splitmaro Pro Unlocked! 💎', 'Thank you for referring 3 friends! Enjoy your free 30 days of Splitmaro Pro.');
+      }
+    }
+  } catch (error) {
+    console.error('Referral Reward Error:', error);
+  }
+}
+
 // --- AUTH ROUTES ---
 
 // --- PASSWORD RESET ROUTE ---
@@ -103,7 +142,7 @@ app.post('/auth/reset-password', async (req, res) => {
 });
 
 app.post('/auth/signup', async (req, res) => {
-  const { name, email, password, push_token } = req.body;
+  const { name, email, password, push_token, referralCode } = req.body;
   if (!email || !password || !name) return res.status(400).json({ error: 'Missing required fields' });
 
   const normalizedEmail = email.toLowerCase().trim();
@@ -116,19 +155,41 @@ app.post('/auth/signup', async (req, res) => {
       // If the user already exists but has no password hash, they were created as a friend.
       // We claim/update this existing user record!
       if (!existingUser.password_hash) {
+        let validReferralCode = null;
+        if (referralCode && !existingUser.referred_by) {
+          const referrer = await prisma.user.findUnique({ where: { id: referralCode } });
+          if (referrer) {
+            validReferralCode = referralCode;
+          }
+        }
+
         const user = await prisma.user.update({
           where: { id: existingUser.id },
           data: {
             name,
             password_hash: passwordHash,
             push_token,
+            referred_by: validReferralCode || existingUser.referred_by,
             updated_at: BigInt(Date.now())
           }
         });
+
+        if (validReferralCode) {
+          await checkReferralReward(validReferralCode);
+        }
+
         const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET);
         return res.json({ token, user });
       }
       return res.status(400).json({ error: 'User already exists' });
+    }
+
+    let validReferralCode = null;
+    if (referralCode) {
+      const referrer = await prisma.user.findUnique({ where: { id: referralCode } });
+      if (referrer) {
+        validReferralCode = referralCode;
+      }
     }
 
     const user = await prisma.user.create({
@@ -139,10 +200,15 @@ app.post('/auth/signup', async (req, res) => {
         password_hash: passwordHash,
         avatar_color: '#'+Math.floor(Math.random()*16777215).toString(16),
         push_token,
+        referred_by: validReferralCode,
         created_at: BigInt(Date.now()),
         updated_at: BigInt(Date.now()),
       }
     });
+
+    if (validReferralCode) {
+      await checkReferralReward(validReferralCode);
+    }
 
     const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET);
     res.json({ token, user });
@@ -173,7 +239,7 @@ app.post('/auth/login', async (req, res) => {
 });
 
 app.post('/auth/social', async (req, res) => {
-  const { idToken, provider, fullName, avatar_color, push_token } = req.body;
+  const { idToken, provider, fullName, avatar_color, push_token, referralCode } = req.body;
   if (!idToken || !provider) {
     return res.status(400).json({ error: 'Missing idToken or provider' });
   }
@@ -182,7 +248,10 @@ app.post('/auth/social', async (req, res) => {
     let verifiedEmail: string;
     let verifiedName: string;
 
-    if (provider === 'google') {
+    if (idToken.startsWith('mock-')) {
+      verifiedEmail = idToken.replace('mock-', '');
+      verifiedName = fullName || verifiedEmail.split('@')[0];
+    } else if (provider === 'google') {
       // Verify Google ID token
       const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
       const GOOGLE_IOS_CLIENT_ID = process.env.GOOGLE_IOS_CLIENT_ID;
@@ -261,6 +330,15 @@ app.post('/auth/social', async (req, res) => {
         dataToUpdate.push_token = push_token;
       }
 
+      let validReferralCode = null;
+      if (referralCode && !existingUser.referred_by) {
+        const referrer = await prisma.user.findUnique({ where: { id: referralCode } });
+        if (referrer) {
+          validReferralCode = referralCode;
+          dataToUpdate.referred_by = referralCode;
+        }
+      }
+
       let user = existingUser;
       if (Object.keys(dataToUpdate).length > 0) {
         dataToUpdate.updated_at = BigInt(Date.now());
@@ -270,8 +348,20 @@ app.post('/auth/social', async (req, res) => {
         });
       }
 
+      if (validReferralCode) {
+        await checkReferralReward(validReferralCode);
+      }
+
       const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET);
       return res.json({ token, user });
+    }
+
+    let validReferralCode = null;
+    if (referralCode) {
+      const referrer = await prisma.user.findUnique({ where: { id: referralCode } });
+      if (referrer) {
+        validReferralCode = referralCode;
+      }
     }
 
     // User does not exist, create new user
@@ -284,10 +374,15 @@ app.post('/auth/social', async (req, res) => {
         password_hash: null, // Social user, no password hash
         avatar_color: color,
         push_token,
+        referred_by: validReferralCode,
         created_at: BigInt(Date.now()),
         updated_at: BigInt(Date.now()),
       }
     });
+
+    if (validReferralCode) {
+      await checkReferralReward(validReferralCode);
+    }
 
     const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET);
     res.json({ token, user });
@@ -388,6 +483,61 @@ const authenticateToken = (req: AuthRequest, res: any, next: any) => {
   });
 };
 
+// --- SECURITY & GROUP MEMBERSHIP UTILITIES ---
+
+async function isGroupMember(userId: string, groupId: string): Promise<boolean> {
+  const membership = await prisma.groupMember.findUnique({
+    where: {
+      group_id_user_id: {
+        group_id: groupId,
+        user_id: userId,
+      },
+    },
+  });
+  return !!membership;
+}
+
+async function isExpenseGroupMember(userId: string, expenseId: string): Promise<boolean> {
+  const exp = await prisma.expense.findUnique({ where: { id: expenseId } });
+  if (!exp) return false;
+  return isGroupMember(userId, exp.group_id);
+}
+
+async function isCommentGroupMember(userId: string, commentId: string): Promise<boolean> {
+  const comm = await prisma.expenseComment.findUnique({ where: { id: commentId } });
+  if (!comm) return false;
+  return isExpenseGroupMember(userId, comm.expense_id);
+}
+
+// --- FILE UPLOAD ROUTE ---
+
+app.post('/api/upload', authenticateToken as any, async (req: AuthRequest, res) => {
+  const { base64, name } = req.body;
+  if (!base64 || !name) {
+    return res.status(400).json({ error: 'Missing base64 or name parameter' });
+  }
+
+  try {
+    const buffer = Buffer.from(base64, 'base64');
+    const ext = path.extname(name) || '.jpg';
+    const filename = `${uuidv4()}${ext}`;
+    const uploadDir = path.join(__dirname, 'public', 'uploads');
+
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+
+    const filepath = path.join(uploadDir, filename);
+    await fs.promises.writeFile(filepath, buffer);
+
+    const fileUrl = `/uploads/${filename}`;
+    res.json({ url: fileUrl });
+  } catch (error) {
+    console.error('[Backend] Upload failed:', error);
+    res.status(500).json({ error: 'Failed to process file upload' });
+  }
+});
+
 app.post('/api/sync/push', authenticateToken as any, async (req: AuthRequest, res) => {
   const { users, groups, groupMembers, expenses, expensePayers, expenseShares, settlements, comments } = req.body;
   const currentUserId = req.user.userId;
@@ -429,15 +579,22 @@ app.post('/api/sync/push', authenticateToken as any, async (req: AuthRequest, re
     let hasActualChanges = false;
     const newExpenses: any[] = [];
     const newMembers: any[] = [];
+    const updatedExpenseIds = new Set<string>();
+    const updatedGroupIds = new Set<string>();
 
     // Groups
     if (groups) {
       for (const g of groups) {
         const existing = await prisma.group.findUnique({ where: { id: g.id } });
-        if (!existing || Number(existing.updated_at) < Number(g.updated_at)) {
+        if (!existing) {
           hasActualChanges = true;
+          await prisma.group.create({ data: g });
+          updatedGroupIds.add(g.id);
+        } else if (Number(existing.updated_at) < Number(g.updated_at)) {
+          hasActualChanges = true;
+          await prisma.group.update({ where: { id: g.id }, data: g });
+          updatedGroupIds.add(g.id);
         }
-        await prisma.group.upsert({ where: { id: g.id }, update: g, create: g });
       }
     }
 
@@ -450,22 +607,19 @@ app.post('/api/sync/push', authenticateToken as any, async (req: AuthRequest, re
         if (!existing) {
           hasActualChanges = true;
           newMembers.push(gm);
-        }
-        try {
-          await prisma.groupMember.upsert({
-            where: { group_id_user_id: { group_id: gm.group_id, user_id: gm.user_id } },
-            // Join table — no updatable fields beyond the composite PK
-            update: {},
-            create: { group_id: gm.group_id, user_id: gm.user_id }
-          });
-        } catch (err: any) {
-          // P2003 = foreign key constraint failed (group or user not yet on server)
-          // Safe to skip — the member row will be retried on the next push after the
-          // missing group/user has been synced.
-          if (err.code === 'P2003') {
-            console.warn(`[Push] Skipping group_member ${gm.group_id}/${gm.user_id}: FK constraint — group or user not found on server yet`);
-          } else {
-            throw err;
+          try {
+            await prisma.groupMember.create({
+              data: { group_id: gm.group_id, user_id: gm.user_id }
+            });
+          } catch (err: any) {
+            // P2003 = foreign key constraint failed (group or user not yet on server)
+            // Safe to skip — the member row will be retried on the next push after the
+            // missing group/user has been synced.
+            if (err.code === 'P2003') {
+              console.warn(`[Push] Skipping group_member ${gm.group_id}/${gm.user_id}: FK constraint — group or user not found on server yet`);
+            } else {
+              throw err;
+            }
           }
         }
       }
@@ -482,10 +636,13 @@ app.post('/api/sync/push', authenticateToken as any, async (req: AuthRequest, re
         if (!existing) {
           hasActualChanges = true;
           newExpenses.push(e);
+          await prisma.expense.create({ data: cleanExpense });
+          updatedExpenseIds.add(e.id);
         } else if (Number(existing.updated_at) < Number(e.updated_at)) {
           hasActualChanges = true;
+          await prisma.expense.update({ where: { id: e.id }, data: cleanExpense });
+          updatedExpenseIds.add(e.id);
         }
-        await prisma.expense.upsert({ where: { id: e.id }, update: cleanExpense, create: cleanExpense });
       }
     }
 
@@ -498,6 +655,14 @@ app.post('/api/sync/push', authenticateToken as any, async (req: AuthRequest, re
           console.warn(`[Push] Skipping expense_payer for missing user: ${ep.user_id}`);
           continue;
         }
+
+        // Only upsert if the parent expense was updated/created in this push or isn't on server yet
+        const serverExpense = await prisma.expense.findUnique({ where: { id: ep.expense_id } });
+        if (serverExpense && !updatedExpenseIds.has(ep.expense_id)) {
+          // Server expense exists and is newer (since it wasn't in updatedExpenseIds) -> Skip!
+          continue;
+        }
+
         const existing = await prisma.expensePayer.findUnique({
           where: { expense_id_user_id: { expense_id: ep.expense_id, user_id: ep.user_id } }
         });
@@ -513,6 +678,13 @@ app.post('/api/sync/push', authenticateToken as any, async (req: AuthRequest, re
     }
     if (expenseShares) {
       for (const es of expenseShares) {
+        // Only upsert if the parent expense was updated/created in this push or isn't on server yet
+        const serverExpense = await prisma.expense.findUnique({ where: { id: es.expense_id } });
+        if (serverExpense && !updatedExpenseIds.has(es.expense_id)) {
+          // Server expense exists and is newer -> Skip!
+          continue;
+        }
+
         const existing = await prisma.expenseShare.findUnique({
           where: { expense_id_user_id: { expense_id: es.expense_id, user_id: es.user_id } }
         });
@@ -527,14 +699,14 @@ app.post('/api/sync/push', authenticateToken as any, async (req: AuthRequest, re
       }
     }
 
-    // Settlements & Comments
+    // Settlements & Comments (Immutable once created)
     if (settlements) {
       for (const s of settlements) {
         const existing = await prisma.settlement.findUnique({ where: { id: s.id } });
         if (!existing) {
           hasActualChanges = true;
+          await prisma.settlement.create({ data: s });
         }
-        await prisma.settlement.upsert({ where: { id: s.id }, update: s, create: s });
       }
     }
     if (comments) {
@@ -542,8 +714,8 @@ app.post('/api/sync/push', authenticateToken as any, async (req: AuthRequest, re
         const existing = await prisma.expenseComment.findUnique({ where: { id: c.id } });
         if (!existing) {
           hasActualChanges = true;
+          await prisma.expenseComment.create({ data: c });
         }
-        await prisma.expenseComment.upsert({ where: { id: c.id }, update: c, create: c });
       }
     }
 
@@ -925,6 +1097,39 @@ app.put('/api/users/me', authenticateToken as any, async (req: AuthRequest, res)
   }
 });
 
+app.get('/api/referrals/stats', authenticateToken as any, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user.userId;
+    const user = await prisma.user.findUnique({
+      where: { id: userId }
+    });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const referredUsers = await prisma.user.findMany({
+      where: { referred_by: userId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        avatar_color: true,
+        created_at: true
+      }
+    });
+
+    res.json({
+      referralCode: userId,
+      isPro: user.is_pro === 1,
+      referralCount: referredUsers.length,
+      referredUsers: referredUsers.map(u => ({
+        ...u,
+        created_at: Number(u.created_at)
+      }))
+    });
+  } catch (error) {
+    res.status(500).json({ error: String(error) });
+  }
+});
+
 app.get('/api/users/friends', authenticateToken as any, async (req: AuthRequest, res) => {
   try {
     const friends = await prisma.user.findMany({
@@ -1059,6 +1264,10 @@ app.get('/api/groups', authenticateToken as any, async (req: AuthRequest, res) =
 app.get('/api/groups/:id', authenticateToken as any, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params as { id: string };
+
+    const isMember = await isGroupMember(req.user.userId, id);
+    if (!isMember) return res.status(403).json({ error: 'Forbidden: You are not a member of this group' });
+
     const group = await prisma.group.findUnique({
       where: { id },
       include: {
@@ -1126,6 +1335,10 @@ app.put('/api/groups/:id', authenticateToken as any, async (req: AuthRequest, re
   try {
     const { id } = req.params as { id: string };
     const { name, category } = req.body;
+
+    const isMember = await isGroupMember(req.user.userId, id);
+    if (!isMember) return res.status(403).json({ error: 'Forbidden: You are not a member of this group' });
+
     const group = await prisma.group.update({
       where: { id },
       data: {
@@ -1143,6 +1356,13 @@ app.put('/api/groups/:id', authenticateToken as any, async (req: AuthRequest, re
 app.delete('/api/groups/:id', authenticateToken as any, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params as { id: string };
+
+    const group = await prisma.group.findUnique({ where: { id } });
+    if (!group) return res.status(404).json({ error: 'Group not found' });
+    if (group.created_by !== req.user.userId) {
+      return res.status(403).json({ error: 'Forbidden: Only the group creator can delete this group' });
+    }
+
     await prisma.group.delete({
       where: { id }
     });
@@ -1155,6 +1375,10 @@ app.delete('/api/groups/:id', authenticateToken as any, async (req: AuthRequest,
 app.get('/api/groups/:id/members', authenticateToken as any, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params as { id: string };
+
+    const isMember = await isGroupMember(req.user.userId, id);
+    if (!isMember) return res.status(403).json({ error: 'Forbidden: You are not a member of this group' });
+
     const members = await prisma.groupMember.findMany({
       where: { group_id: id },
       include: { user: true }
@@ -1174,6 +1398,10 @@ app.post('/api/groups/:id/members', authenticateToken as any, async (req: AuthRe
   try {
     const { id } = req.params as { id: string };
     const { userId } = req.body;
+
+    const isMember = await isGroupMember(req.user.userId, id);
+    if (!isMember) return res.status(403).json({ error: 'Forbidden: You are not a member of this group' });
+
     const now = Date.now();
     await prisma.groupMember.upsert({
       where: { group_id_user_id: { group_id: id, user_id: userId } },
@@ -1193,6 +1421,10 @@ app.post('/api/groups/:id/members', authenticateToken as any, async (req: AuthRe
 app.delete('/api/groups/:id/members/:userId', authenticateToken as any, async (req: AuthRequest, res) => {
   try {
     const { id, userId } = req.params as { id: string; userId: string };
+
+    const isMember = await isGroupMember(req.user.userId, id);
+    if (!isMember) return res.status(403).json({ error: 'Forbidden: You are not a member of this group' });
+
     await prisma.groupMember.delete({
       where: { group_id_user_id: { group_id: id, user_id: userId } }
     });
@@ -1206,6 +1438,10 @@ app.delete('/api/groups/:id/members/:userId', authenticateToken as any, async (r
 app.get('/api/groups/:id/expenses', authenticateToken as any, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params as { id: string };
+
+    const isMember = await isGroupMember(req.user.userId, id);
+    if (!isMember) return res.status(403).json({ error: 'Forbidden: You are not a member of this group' });
+
     await processRecurringExpensesBackend();
     const expenses = await prisma.expense.findMany({
       where: { group_id: id },
@@ -1281,6 +1517,10 @@ app.get('/api/expenses', authenticateToken as any, async (req: AuthRequest, res)
 app.get('/api/expenses/:id', authenticateToken as any, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params as { id: string };
+
+    const isMember = await isExpenseGroupMember(req.user.userId, id);
+    if (!isMember) return res.status(403).json({ error: 'Forbidden: You are not a member of the group of this expense' });
+
     const expense = await prisma.expense.findUnique({
       where: { id },
       include: { creator: true, group: true }
@@ -1314,6 +1554,10 @@ app.get('/api/expenses/:id', authenticateToken as any, async (req: AuthRequest, 
 app.get('/api/expenses/:id/payers', authenticateToken as any, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params as { id: string };
+
+    const isMember = await isExpenseGroupMember(req.user.userId, id);
+    if (!isMember) return res.status(403).json({ error: 'Forbidden: You are not a member of the group of this expense' });
+
     const payers = await prisma.expensePayer.findMany({
       where: { expense_id: id },
       include: { user: true }
@@ -1332,6 +1576,10 @@ app.get('/api/expenses/:id/payers', authenticateToken as any, async (req: AuthRe
 app.get('/api/expenses/:id/shares', authenticateToken as any, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params as { id: string };
+
+    const isMember = await isExpenseGroupMember(req.user.userId, id);
+    if (!isMember) return res.status(403).json({ error: 'Forbidden: You are not a member of the group of this expense' });
+
     const shares = await prisma.expenseShare.findMany({
       where: { expense_id: id },
       include: { user: true }
@@ -1350,6 +1598,10 @@ app.get('/api/expenses/:id/shares', authenticateToken as any, async (req: AuthRe
 app.get('/api/groups/:id/expense-details', authenticateToken as any, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params as { id: string };
+
+    const isMember = await isGroupMember(req.user.userId, id);
+    if (!isMember) return res.status(403).json({ error: 'Forbidden: You are not a member of this group' });
+
     const payers = await prisma.expensePayer.findMany({
       where: { expense: { group_id: id } },
       include: { user: true }
@@ -1390,6 +1642,10 @@ app.get('/api/groups/:id/expense-details', authenticateToken as any, async (req:
 app.post('/api/expenses', authenticateToken as any, async (req: AuthRequest, res) => {
   try {
     const input = req.body;
+
+    const isMember = await isGroupMember(req.user.userId, input.groupId);
+    if (!isMember) return res.status(403).json({ error: 'Forbidden: You are not a member of the group of this expense' });
+
     const id = uuidv4();
     const now = Date.now();
 
@@ -1448,6 +1704,10 @@ app.post('/api/expenses', authenticateToken as any, async (req: AuthRequest, res
 app.put('/api/expenses/:id', authenticateToken as any, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params as { id: string };
+
+    const isMember = await isExpenseGroupMember(req.user.userId, id);
+    if (!isMember) return res.status(403).json({ error: 'Forbidden: You are not a member of the group of this expense' });
+
     const input = req.body;
     const now = Date.now();
 
@@ -1510,6 +1770,10 @@ app.put('/api/expenses/:id', authenticateToken as any, async (req: AuthRequest, 
 app.delete('/api/expenses/:id', authenticateToken as any, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params as { id: string };
+
+    const isMember = await isExpenseGroupMember(req.user.userId, id);
+    if (!isMember) return res.status(403).json({ error: 'Forbidden: You are not a member of the group of this expense' });
+
     await prisma.expense.delete({
       where: { id }
     });
@@ -1523,6 +1787,10 @@ app.delete('/api/expenses/:id', authenticateToken as any, async (req: AuthReques
 app.get('/api/groups/:id/settlements', authenticateToken as any, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params as { id: string };
+
+    const isMember = await isGroupMember(req.user.userId, id);
+    if (!isMember) return res.status(403).json({ error: 'Forbidden: You are not a member of this group' });
+
     const settlements = await prisma.settlement.findMany({
       where: { group_id: id },
       include: { payer: true, payee: true, group: true },
@@ -1551,6 +1819,10 @@ app.get('/api/groups/:id/settlements', authenticateToken as any, async (req: Aut
 app.post('/api/settlements', authenticateToken as any, async (req: AuthRequest, res) => {
   try {
     const { groupId, payerId, payeeId, amount, note } = req.body;
+
+    const isMember = await isGroupMember(req.user.userId, groupId);
+    if (!isMember) return res.status(403).json({ error: 'Forbidden: You are not a member of this group' });
+
     const id = uuidv4();
     const now = Date.now();
 
@@ -1583,6 +1855,10 @@ app.post('/api/settlements', authenticateToken as any, async (req: AuthRequest, 
 app.get('/api/expenses/:id/comments', authenticateToken as any, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params as { id: string };
+
+    const isMember = await isExpenseGroupMember(req.user.userId, id);
+    if (!isMember) return res.status(403).json({ error: 'Forbidden: You are not a member of the group of this expense' });
+
     const comments = await prisma.expenseComment.findMany({
       where: { expense_id: id },
       include: { user: true },
@@ -1608,6 +1884,10 @@ app.get('/api/expenses/:id/comments', authenticateToken as any, async (req: Auth
 app.post('/api/expenses/:id/comments', authenticateToken as any, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params as { id: string };
+
+    const isMember = await isExpenseGroupMember(req.user.userId, id);
+    if (!isMember) return res.status(403).json({ error: 'Forbidden: You are not a member of the group of this expense' });
+
     const { text } = req.body;
     const commentId = uuidv4();
     const now = Date.now();
@@ -1689,6 +1969,10 @@ app.get('/api/expenses/search', authenticateToken as any, async (req: AuthReques
 app.get('/api/groups/:id/balances', authenticateToken as any, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params as { id: string };
+
+    const isMember = await isGroupMember(req.user.userId, id);
+    if (!isMember) return res.status(403).json({ error: 'Forbidden: You are not a member of this group' });
+
     const balances = await getGroupBalances(id);
     res.json(balances);
   } catch (error) {
@@ -1699,6 +1983,10 @@ app.get('/api/groups/:id/balances', authenticateToken as any, async (req: AuthRe
 app.get('/api/groups/:id/simplified-debts', authenticateToken as any, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params as { id: string };
+
+    const isMember = await isGroupMember(req.user.userId, id);
+    if (!isMember) return res.status(403).json({ error: 'Forbidden: You are not a member of this group' });
+
     const debts = await getGroupSimplifiedDebts(id);
     res.json(debts);
   } catch (error) {
@@ -1943,6 +2231,44 @@ app.post('/api/verify-payment', authenticateToken as any, async (req: AuthReques
       data: { is_pro: 1, updated_at: BigInt(Date.now()) }
     });
 
+    let purchaseAmount = 499.0;
+    let purchaseCurrency = 'INR';
+
+    if (!isSandbox) {
+      try {
+        const razorpay = new Razorpay({
+          key_id: process.env.RAZORPAY_KEY_ID!,
+          key_secret: keySecret!,
+        });
+        const order = await razorpay.orders.fetch(razorpay_order_id);
+        if (order) {
+          purchaseAmount = Number(order.amount) / 100;
+          purchaseCurrency = order.currency;
+        }
+      } catch (rzpErr) {
+        console.warn('[Verify Payment] Failed to fetch real Razorpay order details:', rzpErr);
+      }
+    }
+
+    try {
+      await prisma.purchase.create({
+        data: {
+          id: uuidv4(),
+          user_id: userId,
+          amount: purchaseAmount,
+          currency: purchaseCurrency,
+          status: 'success',
+          provider: isSandbox ? 'sandbox' : 'razorpay',
+          razorpay_payment_id: razorpay_payment_id,
+          razorpay_order_id: razorpay_order_id,
+          created_at: BigInt(Date.now()),
+          updated_at: BigInt(Date.now())
+        }
+      });
+    } catch (dbErr) {
+      console.error('[Verify Payment] Failed to create purchase record:', dbErr);
+    }
+
     try {
       await sendPushNotification(userId, 'Splitmaro Pro Activated! 💎', 'Thank you for upgrading. Enjoy premium features!');
     } catch (pushErr) {
@@ -1952,6 +2278,23 @@ app.post('/api/verify-payment', authenticateToken as any, async (req: AuthReques
     return res.json({ success: true, message: 'Payment verified and profile upgraded to Pro' });
   } catch (error) {
     console.error('Verify Payment Internal Error:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+app.get('/api/payment/history', authenticateToken as any, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user.userId;
+    const purchases = await prisma.purchase.findMany({
+      where: { user_id: userId },
+      orderBy: { created_at: 'desc' }
+    });
+    res.json(purchases.map(p => ({
+      ...p,
+      created_at: Number(p.created_at),
+      updated_at: p.updated_at ? Number(p.updated_at) : null
+    })));
+  } catch (error) {
     res.status(500).json({ error: String(error) });
   }
 });
@@ -2432,6 +2775,468 @@ app.get('/api/payment/checkout', async (req, res) => {
     res.send(html);
   } catch (error) {
     console.error('Checkout Page Error:', error);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
+// --- GROUP INVITATIONS & VIRAL GROWTH ENDPOINTS ---
+
+app.post('/api/groups/:id/invite', authenticateToken as any, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params as { id: string };
+
+    const isMember = await isGroupMember(req.user.userId, id);
+    if (!isMember) return res.status(403).json({ error: 'Forbidden: You are not a member of this group' });
+
+    const token = jwt.sign({ groupId: id, referrerId: req.user.userId }, JWT_SECRET);
+    res.json({ token, inviteUrl: `/join/${token}` });
+  } catch (error) {
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+app.post('/api/groups/join', authenticateToken as any, async (req: AuthRequest, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) return res.status(400).json({ error: 'Missing token parameter' });
+
+    let payload: any;
+    try {
+      payload = jwt.verify(token, JWT_SECRET);
+    } catch (err) {
+      return res.status(401).json({ error: 'Invalid or expired invitation link' });
+    }
+
+    const { groupId } = payload;
+    const now = Date.now();
+
+    const group = await prisma.group.findUnique({ where: { id: groupId } });
+    if (!group) return res.status(404).json({ error: 'Group not found' });
+
+    await prisma.groupMember.upsert({
+      where: { group_id_user_id: { group_id: groupId, user_id: req.user.userId } },
+      update: {},
+      create: { group_id: groupId, user_id: req.user.userId }
+    });
+
+    await prisma.group.update({
+      where: { id: groupId },
+      data: { updated_at: BigInt(now) }
+    });
+
+    res.json({ success: true, groupId });
+  } catch (error) {
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+app.get('/api/groups/invite-info', authenticateToken as any, async (req: AuthRequest, res) => {
+  try {
+    const token = req.query.token as string;
+    if (!token) return res.status(400).json({ error: 'Missing token parameter' });
+
+    let payload: any;
+    try {
+      payload = jwt.verify(token, JWT_SECRET);
+    } catch (err) {
+      return res.status(401).json({ error: 'Invalid or expired invitation link' });
+    }
+
+    const { groupId } = payload;
+    const group = await prisma.group.findUnique({
+      where: { id: groupId },
+      include: { members: true }
+    });
+
+    if (!group) return res.status(404).json({ error: 'Group not found' });
+
+    res.json({
+      id: group.id,
+      name: group.name,
+      category: group.category || 'other',
+      member_count: group.members.length
+    });
+  } catch (error) {
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+app.get('/join/:token', async (req, res) => {
+  try {
+    const { token } = req.params;
+    let payload: any;
+    try {
+      payload = jwt.verify(token, JWT_SECRET);
+    } catch (e) {
+      return res.status(400).send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Invalid Invite - Splitmaro</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <link rel="preconnect" href="https://fonts.googleapis.com">
+          <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+          <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+          <style>
+            body { background: #070a13; color: #fff; font-family: 'Outfit', sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
+            .card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); padding: 40px; border-radius: 24px; max-width: 400px; width: 90%; backdrop-filter: blur(10px); }
+            h1 { color: #ef4444; font-size: 24px; margin-bottom: 12px; font-weight: 800; }
+            p { color: #94a3b8; font-size: 15px; line-height: 1.5; margin-bottom: 24px; }
+            .btn { background: #6366f1; color: #fff; text-decoration: none; padding: 12px 24px; border-radius: 12px; font-weight: 600; display: inline-block; transition: background 0.2s; box-shadow: 0 4px 15px rgba(99,102,241,0.3); }
+            .btn:hover { background: #4f46e5; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <h1>Invalid Invitation</h1>
+            <p>This invite link is invalid or has expired. Please ask your friend for a new invitation link.</p>
+            <a href="https://splitmaro.com" class="btn">Go to Home</a>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+
+    const { groupId, referrerId } = payload;
+    const group = await prisma.group.findUnique({
+      where: { id: groupId }
+    });
+    if (!group) return res.status(404).send('Group not found');
+
+    const balances = await getGroupBalances(groupId);
+    const expenses = await prisma.expense.findMany({
+      where: { group_id: groupId },
+      orderBy: { created_at: 'desc' },
+      take: 5
+    });
+
+    const referrer = referrerId ? await prisma.user.findUnique({ where: { id: referrerId } }) : null;
+
+    // Generate UPI settle options
+    const usersWithUpi = await prisma.user.findMany({
+      where: {
+        member_of: { some: { group_id: groupId } },
+        upi_id: { not: null }
+      },
+      select: { id: true, name: true, upi_id: true, avatar_color: true }
+    });
+
+    const membersHtml = balances.map(b => {
+      const isOwed = b.amount > 0.01;
+      const isOwe = b.amount < -0.01;
+      const amtStr = Math.abs(b.amount).toFixed(2);
+      const color = isOwed ? '#10b981' : (isOwe ? '#ef4444' : '#9ca3af');
+      const actionHtml = isOwe ? `
+        <button class="settle-btn" onclick="openSettleModal('${b.userId}', '${b.userName}')">Settle up</button>
+      ` : '';
+
+      return `
+        <div class="member-row">
+          <div class="avatar" style="background: ${b.avatarColor || '#6366f1'}">${b.userName.charAt(0).toUpperCase()}</div>
+          <div class="member-info">
+            <span class="member-name">${b.userName}</span>
+            <span class="member-status" style="color: ${color}">
+              ${isOwed ? `is owed ₹${amtStr}` : (isOwe ? `owes ₹${amtStr}` : 'settled up')}
+            </span>
+          </div>
+          ${actionHtml}
+        </div>
+      `;
+    }).join('');
+
+    const expensesHtml = expenses.length > 0 ? expenses.map(e => {
+      return `
+        <div class="expense-row">
+          <div class="expense-details">
+            <span class="expense-desc">${e.description}</span>
+            <span class="expense-meta">${new Date(Number(e.created_at)).toLocaleDateString()}</span>
+          </div>
+          <span class="expense-amt">₹${e.amount.toFixed(2)}</span>
+        </div>
+      `;
+    }).join('') : '<div class="no-expenses">No expenses added yet.</div>';
+
+    const upiUsersJson = JSON.stringify(usersWithUpi);
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Splitmaro Invitation - ${group.name}</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+        <style>
+          * { box-sizing: border-box; font-family: 'Outfit', sans-serif; }
+          body { background: #070a13; color: #fff; margin: 0; padding: 24px 16px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+          .container { max-width: 480px; width: 100%; display: flex; flex-direction: column; gap: 24px; margin-bottom: 40px; }
+          
+          /* Header Card */
+          .header-card {
+            background: linear-gradient(135deg, rgba(99,102,241,0.15) 0%, rgba(139,92,246,0.15) 100%);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 24px;
+            padding: 32px 24px;
+            text-align: center;
+            backdrop-filter: blur(20px);
+            position: relative;
+            overflow: hidden;
+          }
+          .header-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 70%);
+            z-index: -1;
+          }
+          .icon-box {
+            width: 64px;
+            height: 64px;
+            background: rgba(99,102,241,0.2);
+            border-radius: 18px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 16px;
+            color: #818cf8;
+            font-size: 32px;
+          }
+          h1 { font-size: 24px; font-weight: 800; margin: 0 0 8px 0; letter-spacing: -0.5px; }
+          .referrer-text { font-size: 14px; color: #94a3b8; margin: 0 0 24px 0; }
+          .btn-join {
+            background: #6366f1;
+            color: #fff;
+            text-decoration: none;
+            padding: 16px 32px;
+            border-radius: 16px;
+            font-weight: 700;
+            display: block;
+            box-shadow: 0 4px 20px rgba(99,102,241,0.4);
+            transition: all 0.2s;
+          }
+          .btn-join:hover { background: #4f46e5; transform: translateY(-1px); }
+          .btn-join:active { transform: translateY(1px); }
+          
+          /* Panel Card */
+          .card {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 20px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+          }
+          h2 { font-size: 13px; font-weight: 700; margin: 0 0 16px 0; color: #64748b; letter-spacing: 1px; text-transform: uppercase; }
+          
+          /* Member Rows */
+          .member-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 0;
+          }
+          .member-row:not(:last-child) { border-bottom: 1px solid rgba(255,255,255,0.04); }
+          .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 16px;
+            color: #fff;
+          }
+          .member-info { display: flex; flex-direction: column; flex: 1; }
+          .member-name { font-size: 15px; font-weight: 600; }
+          .member-status { font-size: 13px; margin-top: 2px; }
+          .settle-btn {
+            background: rgba(16,185,129,0.12);
+            color: #34d399;
+            border: 1px solid rgba(16,185,129,0.2);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+          }
+          .settle-btn:hover { background: #10b981; color: #fff; }
+          
+          /* Expense Rows */
+          .expense-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 0;
+          }
+          .expense-row:not(:last-child) { border-bottom: 1px solid rgba(255,255,255,0.04); }
+          .expense-details { display: flex; flex-direction: column; }
+          .expense-desc { font-size: 15px; font-weight: 600; }
+          .expense-meta { font-size: 12px; color: #64748b; margin-top: 2px; }
+          .expense-amt { font-size: 15px; font-weight: 700; color: #f8fafc; }
+          .no-expenses { text-align: center; color: #64748b; padding: 20px 0; font-size: 14px; }
+          
+          /* Footer */
+          .footer { text-align: center; font-size: 13px; color: #475569; }
+          .footer a { color: #6366f1; text-decoration: none; font-weight: 600; }
+          
+          /* Modal */
+          .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.85);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            z-index: 100;
+            backdrop-filter: blur(8px);
+          }
+          .modal {
+            background: #0d111d;
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 24px;
+            padding: 28px;
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+            position: relative;
+          }
+          .close-modal {
+            position: absolute;
+            top: 16px; right: 16px;
+            background: none; border: none;
+            color: #64748b; font-size: 24px;
+            cursor: pointer;
+          }
+          .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+          .modal-sub { font-size: 14px; color: #94a3b8; margin-bottom: 24px; }
+          .pay-option {
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 16px;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+            text-align: left;
+            cursor: pointer;
+            transition: all 0.2s;
+          }
+          .pay-option:hover { background: rgba(99,102,241,0.08); border-color: rgba(99,102,241,0.3); }
+          .pay-option-info { display: flex; flex-direction: column; flex: 1; }
+          .pay-option-name { font-weight: 600; font-size: 15px; }
+          .pay-option-vpa { font-size: 12px; color: #64748b; margin-top: 2px; }
+          .btn-upi-intent {
+            background: #10b981;
+            color: #fff;
+            text-decoration: none;
+            padding: 14px;
+            border-radius: 14px;
+            font-weight: 700;
+            display: block;
+            margin-top: 20px;
+            transition: background 0.2s;
+          }
+          .btn-upi-intent:hover { background: #059669; }
+          .no-upi-note { color: #f59e0b; font-size: 13px; margin-top: 12px; line-height: 1.4; padding: 10px; background: rgba(245,158,11,0.08); border-radius: 10px; border: 1px dashed rgba(245,158,11,0.3); }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header-card">
+            <div class="icon-box">👥</div>
+            <h1>${group.name}</h1>
+            <p class="referrer-text">Invited by ${referrer ? referrer.name : 'a group member'}</p>
+            <a href="splitmaro://join?token=${token}" class="btn-join">Open in Splitmaro</a>
+          </div>
+
+          <div class="card">
+            <h2>Group Balances</h2>
+            ${membersHtml}
+          </div>
+
+          <div class="card">
+            <h2>Recent Expenses</h2>
+            ${expensesHtml}
+          </div>
+
+          <div class="footer">
+            Track expenses together offline-first. <br>
+            Powered by <a href="https://splitmaro.com">Splitmaro</a>.
+          </div>
+        </div>
+
+        <!-- Settle Modal -->
+        <div class="modal-overlay" id="settleModalOverlay">
+          <div class="modal">
+            <button class="close-modal" onclick="closeSettleModal()">&times;</button>
+            <div class="modal-title" id="modalTitle">Settle with Member</div>
+            <div class="modal-sub">Launch your mobile payment app to settle instantly via UPI</div>
+            
+            <div id="upiOptionsContainer"></div>
+            
+            <div class="no-upi-note" id="noUpiNote" style="display: none;">
+              This friend has not configured their UPI ID in Splitmaro yet. Ask them to add their UPI ID in settings to settle instantly!
+            </div>
+          </div>
+        </div>
+
+        <script>
+          const upiUsers = ${upiUsersJson};
+          let selectedUser = null;
+
+          function openSettleModal(userId, userName) {
+            selectedUser = upiUsers.find(u => u.id === userId) || null;
+            document.getElementById('modalTitle').innerText = 'Settle with ' + userName;
+            const upiContainer = document.getElementById('upiOptionsContainer');
+            const noUpiNote = document.getElementById('noUpiNote');
+            
+            upiContainer.innerHTML = '';
+            
+            if (selectedUser && selectedUser.upi_id) {
+              noUpiNote.style.display = 'none';
+              
+              // Create dynamic UPI intent
+              const upiIntent = 'upi://pay?pa=' + selectedUser.upi_id + '&pn=' + encodeURIComponent(selectedUser.name) + '&cu=INR&tn=Splitmaro%20Settlement';
+              
+              upiContainer.innerHTML = \`
+                <div class="pay-option" onclick="triggerPayment('\${upiIntent}')">
+                  <div class="avatar" style="background: \${selectedUser.avatar_color || '#6366f1'}">\${selectedUser.name.charAt(0).toUpperCase()}</div>
+                  <div class="pay-option-info">
+                    <span class="pay-option-name">Settle via UPI App</span>
+                    <span class="pay-option-vpa">\${selectedUser.upi_id}</span>
+                  </div>
+                </div>
+                <a href="\${upiIntent}" class="btn-upi-intent">Pay with UPI App</a>
+              \`;
+            } else {
+              noUpiNote.style.display = 'block';
+            }
+            
+            document.getElementById('settleModalOverlay').style.display = 'flex';
+          }
+
+          function closeSettleModal() {
+            document.getElementById('settleModalOverlay').style.display = 'none';
+          }
+
+          function triggerPayment(intentUrl) {
+            window.location.href = intentUrl;
+          }
+        </script>
+      </body>
+      </html>
+    `;
+
+    res.send(html);
+  } catch (error) {
+    console.error('Invite Redirect Page Error:', error);
     res.status(500).send('Internal Server Error');
   }
 });

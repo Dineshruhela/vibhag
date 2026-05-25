@@ -90,6 +90,7 @@ async function runTests() {
     console.log('🌐 Testing Social Auth (New)...');
     const socialNewEmail = `social-${Date.now()}@example.com`;
     const socialNewRes = await axios.post(`${API_URL}/auth/social`, {
+      idToken: `mock-${socialNewEmail}`,
       name: 'Social Test User',
       email: socialNewEmail,
       provider: 'google'
@@ -103,6 +104,7 @@ async function runTests() {
     // 6. Social Auth (Existing Reconciled)
     console.log('🔄 Testing Social Auth (Reconciled with standard)...');
     const socialRecRes = await axios.post(`${API_URL}/auth/social`, {
+      idToken: `mock-${testEmail}`,
       name: 'Social Reconciled Name',
       email: testEmail,
       provider: 'apple'

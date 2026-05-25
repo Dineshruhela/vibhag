@@ -230,6 +230,28 @@ export default function ProfileScreen() {
           </Card>
         </Animated.View>
 
+        <Animated.View entering={FadeInDown.delay(270).springify()}>
+          <Text style={[styles.label, { color: colors.textSecondary, marginTop: Spacing.xl }]}>GROWTH & VIRALITY</Text>
+          <Card variant="default" padding={0} style={{ overflow: 'hidden' }}>
+            <Pressable 
+              onPress={() => router.push('/pro/referrals')}
+              style={[styles.infoRow, { backgroundColor: colors.surface }]}
+              android_ripple={{ color: colors.borderLight }}
+            >
+              <View style={[styles.proIcon, { backgroundColor: colors.primary + '15' }]}>
+                <Ionicons name="gift-outline" size={20} color={colors.primary} />
+              </View>
+              <View style={styles.infoTextContainer}>
+                <Text style={[styles.infoTitle, { color: colors.text }]}>Refer Friends, Get Pro</Text>
+                <Text style={[styles.infoSub, { color: colors.textTertiary }]}>
+                  Share Splitmaro & unlock Pro features for free!
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+            </Pressable>
+          </Card>
+        </Animated.View>
+
         <Animated.View entering={FadeInDown.delay(300).springify()}>
           <Text style={[styles.label, { color: colors.textSecondary, marginTop: Spacing.xl }]}>AVATAR COLOR</Text>
           <Card variant="default" style={styles.colorCard}>

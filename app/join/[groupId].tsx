@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import Animated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { addGroupMember, getCurrentUser, getGroup, getGroupMembers, type Group } from '../../lib/database';
+import { addGroupMember, apiRequest, getCurrentUser, getGroup, getGroupMembers, type Group } from '../../lib/database';
 
 const CATEGORY_EMOJI: Record<string, string> = {
   trip: '✈️', home: '🏠', couple: '❤️', work: '💼', other: '👥',
@@ -37,17 +37,23 @@ export default function JoinGroupScreen() {
   const loadGroup = useCallback(async () => {
     if (!groupId) { setNotFound(true); setLoading(false); return; }
     try {
-      const [g, currentUser] = await Promise.all([
-        getGroup(groupId),
-        getCurrentUser(),
-      ]);
+      const currentUser = await getCurrentUser();
+      let g: any;
+      if (groupId.includes('.')) {
+        // It's a JWT invite token!
+        g = await apiRequest(`/api/groups/invite-info?token=${groupId}`);
+      } else {
+        // It's a raw group ID!
+        g = await getGroup(groupId);
+      }
       if (!g) { setNotFound(true); setLoading(false); return; }
       setGroup(g);
 
       // Check if current user is already a member
-      const members = await getGroupMembers(groupId);
+      const members = await getGroupMembers(g.id);
       setAlreadyMember(members.some(m => m.id === currentUser.id));
     } catch (e) {
+      console.warn('[JoinGroup] Load failed:', e);
       setNotFound(true);
     } finally {
       setLoading(false);
@@ -60,12 +66,22 @@ export default function JoinGroupScreen() {
     if (!group) return;
     setJoining(true);
     try {
-      const currentUser = await getCurrentUser();
-      await addGroupMember(group.id, currentUser.id);
+      let resolvedGroupId = group.id;
+      if (groupId && groupId.includes('.')) {
+        const res = await apiRequest('/api/groups/join', {
+          method: 'POST',
+          body: JSON.stringify({ token: groupId })
+        });
+        resolvedGroupId = res.groupId;
+      } else {
+        const currentUser = await getCurrentUser();
+        await addGroupMember(group.id, currentUser.id);
+      }
+
       Alert.alert(
         'Joined! 🎉',
         `You've joined "${group.name}". You can now view and add expenses.`,
-        [{ text: 'View Group', onPress: () => router.replace(`/group/${group.id}` as any) }]
+        [{ text: 'View Group', onPress: () => router.replace(`/group/${resolvedGroupId}` as any) }]
       );
     } catch (e) {
       Alert.alert('Error', 'Failed to join group. Please try again.');
