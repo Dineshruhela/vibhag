@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Splitmaro Pro Admin Console</title>
+  
+  <!-- Premium Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Premium CSS styling -->
+  <style>
+    :root {
+      --bg: #0A0D14;
+      --bg-gradient: radial-gradient(circle at top left, #121824, #0A0D14);
+      --card-bg: rgba(255, 255, 255, 0.03);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --card-hover-border: rgba(255, 255, 255, 0.15);
+      --primary: #FF7B39;
+      --primary-hover: #E06324;
+      --primary-light: rgba(255, 123, 57, 0.15);
+      --text: #FFFFFF;
+      --text-secondary: #9EADB9;
+      --text-tertiary: #627282;
+      --success: #2ECC71;
+      --warning: #F1C40F;
+      --danger: #E74C3C;
+      --font: 'Outfit', sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: var(--font);
+    }
+
+    body {
+      background: var(--bg);
+      background-image: var(--bg-gradient);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* Layout Elements */
+    header {
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-icon {
+      background: var(--primary);
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transform: rotate(45deg);
+      box-shadow: 0 4px 15px rgba(255, 123, 57, 0.3);
+    }
+
+    .brand-icon svg {
+      transform: rotate(-45deg);
+      width: 20px;
+      height: 20px;
+      fill: #fff;
+    }
+
+    .brand-name {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+
+    .btn-logout {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-secondary);
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn-logout:hover {
+      border-color: var(--danger);
+      color: var(--danger);
+      background: rgba(231, 76, 60, 0.05);
+    }
+
+    main {
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px 48px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 32px;
+    }
+
+    /* Glassmorphic Container */
+    .glass-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-radius: 16px;
+      padding: 24px;
+      transition: border-color 0.2s ease;
+    }
+
+    .glass-card:hover {
+      border-color: var(--card-hover-border);
+    }
+
+    /* Grid Stats */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+    }
+
+    .stat-card {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .stat-icon-wrap {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 4px;
+    }
+
+    .stat-val {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+
+    .stat-lbl {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    /* Columns Layout */
+    .dashboard-body {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 24px;
+    }
+
+    @media (min-width: 900px) {
+      .dashboard-body {
+        grid-template-columns: 380px 1fr;
+      }
+    }
+
+    .section-title {
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--text-secondary);
+      letter-spacing: 1.5px;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+    }
+
+    /* Config Panel */
+    .config-card {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .config-inputs {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .input-col {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .input-col label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-tertiary);
+      letter-spacing: 0.5px;
+    }
+
+    .form-control {
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 12px;
+      font-size: 15px;
+      width: 100%;
+      outline: none;
+      transition: border-color 0.2s ease;
+    }
+
+    .form-control:focus {
+      border-color: var(--primary);
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      border: none;
+      color: #fff;
+      padding: 12px;
+      font-size: 15px;
+      font-weight: 700;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      width: 100%;
+      box-shadow: 0 4px 15px rgba(255, 123, 57, 0.2);
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-hover);
+      transform: translateY(-1px);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* Logs Panel */
+    .logs-card {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      max-height: 520px;
+      overflow-y: auto;
+    }
+
+    .log-item {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.015);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      border-radius: 12px;
+    }
+
+    .log-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .log-meta {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .log-user-name {
+      font-size: 15px;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .log-user-email {
+      font-size: 12px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .log-price-box {
+      text-align: right;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+    }
+
+    .log-amount {
+      font-size: 16px;
+      font-weight: 800;
+    }
+
+    .badge {
+      font-size: 9px;
+      font-weight: 800;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid transparent;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .badge-success {
+      color: var(--success);
+      border-color: rgba(46, 204, 113, 0.2);
+      background: rgba(46, 204, 113, 0.05);
+    }
+
+    .badge-warning {
+      color: var(--warning);
+      border-color: rgba(241, 196, 15, 0.2);
+      background: rgba(241, 196, 15, 0.05);
+    }
+
+    .badge-danger {
+      color: var(--danger);
+      border-color: rgba(231, 76, 60, 0.2);
+      background: rgba(231, 76, 60, 0.05);
+    }
+
+    .log-footer {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+      gap: 12px;
+      padding-top: 10px;
+      border-top: 1px dashed rgba(255, 255, 255, 0.04);
+    }
+
+    .footer-col {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .footer-lbl {
+      font-size: 9px;
+      font-weight: 700;
+      color: var(--text-tertiary);
+      letter-spacing: 0.5px;
+    }
+
+    .footer-val {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+
+    /* Login Screen Layout */
+    .login-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: var(--bg);
+      background-image: var(--bg-gradient);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 24px;
+    }
+
+    .login-card {
+      width: 100%;
+      max-width: 400px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      padding: 32px;
+    }
+
+    .login-header {
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .login-header h1 {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+
+    .login-header p {
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .login-form {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .error-alert {
+      background: rgba(231, 76, 60, 0.1);
+      border: 1px solid rgba(231, 76, 60, 0.2);
+      color: var(--danger);
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      display: none;
+    }
+
+    /* Utilities */
+    .loading-spinner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 48px;
+      flex: 1;
+    }
+
+    .spinner {
+      border: 3px solid rgba(255, 255, 255, 0.05);
+      border-top: 3px solid var(--primary);
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    /* Scrollbars customizer */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- LOGIN OVERLAY -->
+  <div id="login-overlay" class="login-overlay hidden">
+    <div class="glass-card login-card">
+      <div class="login-header">
+        <div class="brand-icon">
+          <svg viewBox="0 0 24 24"><path d="M12 2L2 22h20L12 2zm0 3.99L19.53 19H4.47L12 5.99zm-1 8h2v2h-2v-2zm0-4h2v3h-2v-3z"/></svg>
+        </div>
+        <h1>Admin Sign In</h1>
+        <p>Access the Splitmaro Pro Console</p>
+      </div>
+
+      <div id="error-alert" class="error-alert"></div>
+
+      <form id="login-form" class="login-form" onsubmit="handleLogin(event)">
+        <div class="input-col">
+          <label for="email">ADMIN EMAIL</label>
+          <input type="email" id="email" class="form-control" placeholder="admin@splitmaro.com" required autocomplete="email">
+        </div>
+        <div class="input-col">
+          <label for="password">PASSWORD</label>
+          <input type="password" id="password" class="form-control" placeholder="••••••••" required autocomplete="current-password">
+        </div>
+        <button type="submit" id="btn-login-submit" class="btn-primary">Sign In</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- APPLICATION HEADER -->
+  <header id="app-header" class="hidden">
+    <div class="brand">
+      <div class="brand-icon">
+        <svg viewBox="0 0 24 24"><path d="M12 2L2 22h20L12 2zm0 3.99L19.53 19H4.47L12 5.99zm-1 8h2v2h-2v-2zm0-4h2v3h-2v-3z"/></svg>
+      </div>
+      <div class="brand-name">Splitmaro Pro</div>
+    </div>
+    <button onclick="handleLogout()" class="btn-logout">Log Out</button>
+  </header>
+
+  <!-- LOADING FEEDBACK -->
+  <div id="loading-view" class="loading-spinner">
+    <div class="spinner"></div>
+    <p style="color: var(--text-secondary); font-weight: 600;">Authenticating Console...</p>
+  </div>
+
+  <!-- MAIN DASHBOARD CONTENT -->
+  <main id="main-view" class="hidden">
+    <!-- Stats Row -->
+    <div class="stats-grid" id="stats-grid">
+      <!-- Mapped dynamically -->
+    </div>
+
+    <!-- Dual Layout -->
+    <div class="dashboard-body">
+      <!-- Dynamic Configuration Form -->
+      <div>
+        <h2 class="section-title">Pricing Configuration</h2>
+        <div class="glass-card config-card">
+          <div class="config-inputs">
+            <div class="input-col">
+              <label for="config-amount">PRO AMOUNT</label>
+              <input type="number" id="config-amount" class="form-control" placeholder="499" min="1" step="any">
+            </div>
+            <div class="input-col">
+              <label for="config-currency">CURRENCY CODE</label>
+              <input type="text" id="config-currency" class="form-control" placeholder="INR" maxlength="5">
+            </div>
+          </div>
+          <button id="btn-save-config" onclick="handleSaveConfig()" class="btn-primary">Update Pricing settings</button>
+        </div>
+      </div>
+
+      <!-- Transaction Feed -->
+      <div>
+        <h2 class="section-title">System Transaction Logs</h2>
+        <div class="glass-card logs-card" id="logs-feed">
+          <!-- Mapped dynamically -->
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Javascript dynamic controller logic -->
+  <script>
+    const API_BASE = window.location.origin;
+
+    // Check auth token and load session
+    window.addEventListener('DOMContentLoaded', () => {
+      checkAuth();
+    });
+
+    function checkAuth() {
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        showLoginOverlay();
+      } else {
+        loadDashboard(token);
+      }
+    }
+
+    function showLoginOverlay() {
+      document.getElementById('loading-view').classList.add('hidden');
+      document.getElementById('app-header').classList.add('hidden');
+      document.getElementById('main-view').classList.add('hidden');
+      document.getElementById('login-overlay').classList.remove('hidden');
+    }
+
+    async function handleLogin(e) {
+      e.preventDefault();
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const errorAlert = document.getElementById('error-alert');
+      const submitBtn = document.getElementById('btn-login-submit');
+
+      errorAlert.style.display = 'none';
+      submitBtn.disabled = true;
+      submitBtn.innerText = 'Signing In...';
+
+      try {
+        const response = await fetch(`${API_BASE}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || 'Authentication failed');
+        }
+
+        if (data.user && data.user.is_admin === 1) {
+          localStorage.setItem('admin_token', data.token);
+          document.getElementById('login-overlay').classList.add('hidden');
+          loadDashboard(data.token);
+        } else {
+          throw new Error('Access denied: Administrator privileges required.');
+        }
+      } catch (err) {
+        errorAlert.innerText = err.message;
+        errorAlert.style.display = 'block';
+        submitBtn.disabled = false;
+        submitBtn.innerText = 'Sign In';
+      }
+    }
+
+    function handleLogout() {
+      localStorage.removeItem('admin_token');
+      showLoginOverlay();
+    }
+
+    async function loadDashboard(token) {
+      document.getElementById('login-overlay').classList.add('hidden');
+      document.getElementById('loading-view').classList.remove('hidden');
+      document.getElementById('app-header').classList.add('hidden');
+      document.getElementById('main-view').classList.add('hidden');
+
+      try {
+        // 1. Fetch system-wide administrative stats and orders feed
+        const statsRes = await fetch(`${API_BASE}/api/admin/stats`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (statsRes.status === 401 || statsRes.status === 403) {
+          handleLogout();
+          return;
+        }
+
+        const stats = await statsRes.json();
+        if (!statsRes.ok) {
+          throw new Error(stats.error || 'Failed to fetch admin statistics');
+        }
+
+        // 2. Fetch current configurations values
+        const configRes = await fetch(`${API_BASE}/api/payment/config`);
+        const config = await configRes.json();
+
+        // 3. Render configurations inputs values
+        document.getElementById('config-amount').value = config.amount;
+        document.getElementById('config-currency').value = config.currency;
+
+        // 4. Render Dynamic metrics stats panels
+        renderStatsGrid(stats, config.currency);
+
+        // 5. Render transaction logs list feed
+        renderLogsFeed(stats.purchases);
+
+        // Transition views out of load triggers
+        document.getElementById('loading-view').classList.add('hidden');
+        document.getElementById('app-header').classList.remove('hidden');
+        document.getElementById('main-view').classList.remove('hidden');
+      } catch (err) {
+        console.error(err);
+        alert(err.message || 'Fatal error loading dashboard. Please log in again.');
+        handleLogout();
+      }
+    }
+
+    function renderStatsGrid(stats, currencyCode) {
+      const currencySymbol = currencyCode === 'INR' ? '₹' : currencyCode;
+      const grid = document.getElementById('stats-grid');
+      
+      const items = [
+        { title: 'Total Registered Users', value: stats.totalUsers, color: '#3498DB', bg: 'rgba(52, 152, 219, 0.15)' },
+        { title: 'Premium Subscribers', value: stats.proUsers, color: '#9B59B6', bg: 'rgba(155, 89, 182, 0.15)' },
+        { title: 'Viral Referrals', value: stats.totalReferrals, color: '#2ECC71', bg: 'rgba(46, 204, 113, 0.15)' },
+        { title: 'Compiled Revenue', value: `${currencySymbol} ${Math.round(stats.totalRevenue)}`, color: '#E67E22', bg: 'rgba(230, 126, 34, 0.15)' }
+      ];
+
+      grid.innerHTML = items.map(item => `
+        <div class="glass-card stat-card">
+          <div class="stat-icon-wrap" style="background: ${item.bg}">
+            <div style="background: ${item.color}; width: 10px; height: 10px; border-radius: 50%;"></div>
+          </div>
+          <div class="stat-val">${item.value}</div>
+          <div class="stat-lbl">${item.title}</div>
+        </div>
+      `).join('');
+    }
+
+    function renderLogsFeed(purchases) {
+      const feed = document.getElementById('logs-feed');
+      if (!purchases || purchases.length === 0) {
+        feed.innerHTML = `
+          <div style="text-align: center; padding: 32px; color: var(--text-tertiary);">
+            <svg style="width: 48px; height: 48px; fill: currentColor; margin-bottom: 12px;" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+            <p style="font-weight: 600; font-size: 14px;">No transactions logged in the database yet.</p>
+          </div>
+        `;
+        return;
+      }
+
+      feed.innerHTML = purchases.map(p => {
+        const name = p.user ? p.user.name : 'Deleted User';
+        const email = p.user ? p.user.email : 'N/A';
+        const color = p.user ? p.user.avatar_color : '#7F8C8D';
+        const initial = name.charAt(0).toUpperCase();
+        
+        const currencySymbol = p.currency === 'INR' ? '₹' : p.currency;
+        
+        let badgeClass = 'badge-warning';
+        if (p.status.toLowerCase() === 'success') badgeClass = 'badge-success';
+        if (p.status.toLowerCase() === 'failed') badgeClass = 'badge-danger';
+
+        const dateStr = new Date(p.created_at).toLocaleDateString(undefined, {
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+
+        return `
+          <div class="log-item">
+            <div class="log-header">
+              <div class="avatar" style="background: ${color}">${initial}</div>
+              <div class="log-meta">
+                <div class="log-user-name">${name}</div>
+                <div class="log-user-email">${email}</div>
+              </div>
+              <div class="log-price-box">
+                <div class="log-amount">${currencySymbol} ${p.amount}</div>
+                <span class="badge ${badgeClass}">${p.status}</span>
+              </div>
+            </div>
+            <div class="log-footer">
+              <div class="footer-col">
+                <div class="footer-lbl">PROVIDER</div>
+                <div class="footer-val">${p.provider.toUpperCase()}</div>
+              </div>
+              <div class="footer-col">
+                <div class="footer-lbl">TIMESTAMP</div>
+                <div class="footer-val">${dateStr}</div>
+              </div>
+              ${p.razorpay_payment_id ? `
+                <div class="footer-col" style="grid-column: span 2;">
+                  <div class="footer-lbl">PAYMENT ID</div>
+                  <div class="footer-val" style="font-family: monospace; font-size: 10px;">${p.razorpay_payment_id}</div>
+                </div>
+              ` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function handleSaveConfig() {
+      const amount = Number(document.getElementById('config-amount').value);
+      const currency = document.getElementById('config-currency').value.trim().toUpperCase();
+      const saveBtn = document.getElementById('btn-save-config');
+      const token = localStorage.getItem('admin_token');
+
+      if (isNaN(amount) || amount < 1) {
+        alert('Pricing amount must be a valid number greater than or equal to 1');
+        return;
+      }
+      if (!currency || currency.length > 5) {
+        alert('Currency code must be a valid 1 to 5 character code (e.g. INR, USD, EUR)');
+        return;
+      }
+
+      saveBtn.disabled = true;
+      saveBtn.innerText = 'Updating Configurations...';
+
+      try {
+        const response = await fetch(`${API_BASE}/api/admin/config`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ amount, currency })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to update configurations');
+        }
+
+        alert('Pricing and currency configurations updated successfully!');
+        loadDashboard(token);
+      } catch (err) {
+        alert(err.message || 'Error saving settings');
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.innerText = 'Update Pricing settings';
+      }
+    }
+  </script>
+</body>
+</html>
