@@ -15,6 +15,7 @@ model User {
   avatar_color    String
   upi_id          String?
   is_pro          Int      @default(0)
+  is_admin        Int      @default(0)
   is_current_user Int      @default(0)
   budget_amount   Float?
   password_hash   String?
@@ -95,7 +96,7 @@ model ExpenseShare {
   user_id      String
   share_amount Float
   expense      Expense @relation(fields: [expense_id], references: [id], onDelete: Cascade)
-  user         User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user       User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@id([expense_id, user_id])
 }
@@ -138,4 +139,10 @@ model Purchase {
   updated_at          BigInt?
 
   user                User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model SystemSetting {
+  key        String   @id
+  value      String
+  updated_at BigInt
 }

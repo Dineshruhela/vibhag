@@ -7,7 +7,7 @@ import { AvatarColors } from '@/constants/Colors';
 import { BorderRadius, Spacing } from '@/constants/Spacing';
 import { useSync } from '@/hooks/useSync';
 import { useThemeColors } from '@/hooks/useThemeColor';
-import { api } from '@/lib/api';
+import { api, apiRequest } from '@/lib/api';
 import { cancelAllNotifications, scheduleDailyDebtReminder } from '@/lib/notifications';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -31,6 +31,9 @@ export default function ProfileScreen() {
   const [upiId, setUpiId] = useState('');
   const [saving, setSaving] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [adminPrice, setAdminPrice] = useState('');
+  const [adminCurrency, setAdminCurrency] = useState('');
+  const [updatingConfig, setUpdatingConfig] = useState(false);
 
   const loadUser = async () => {
     try {
@@ -51,6 +54,48 @@ export default function ProfileScreen() {
       if (val !== null) setNotificationsEnabled(val === 'true');
     });
   }, []);
+
+  useEffect(() => {
+    if (user && user.is_admin === 1) {
+      (async () => {
+        try {
+          const config = await apiRequest('/api/payment/config');
+          if (config) {
+            setAdminPrice(String(config.amount));
+            setAdminCurrency(config.currency);
+          }
+        } catch (err) {
+          console.warn('[ProfileScreen] Failed to fetch pricing config for admin:', err);
+        }
+      })();
+    }
+  }, [user]);
+
+  const handleSavePricing = async () => {
+    const parsedPrice = Number(adminPrice);
+    if (isNaN(parsedPrice) || parsedPrice < 1) {
+      Alert.alert('Invalid Price', 'Price must be a valid number greater than or equal to 1.');
+      return;
+    }
+    const cleanCurrency = adminCurrency.trim().toUpperCase();
+    if (!cleanCurrency || cleanCurrency.length > 5) {
+      Alert.alert('Invalid Currency', 'Currency code must be 1 to 5 characters long.');
+      return;
+    }
+
+    setUpdatingConfig(true);
+    try {
+      await apiRequest('/api/admin/config', {
+        method: 'POST',
+        body: JSON.stringify({ amount: parsedPrice, currency: cleanCurrency })
+      });
+      Alert.alert('Pricing Updated', `Splitmaro Pro is now priced at ${cleanCurrency} ${parsedPrice}.`);
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to update pricing settings.');
+    } finally {
+      setUpdatingConfig(false);
+    }
+  };
 
   const handleRefresh = async () => {
     await pullFromCloud();
@@ -270,6 +315,65 @@ export default function ProfileScreen() {
             </View>
           </Card>
         </Animated.View>
+
+        {!!user.is_admin && (
+          <Animated.View entering={FadeInDown.delay(350).springify()}>
+            <Text style={[styles.label, { color: colors.textSecondary, marginTop: Spacing.xl }]}>ADMIN CONSOLE 🛠</Text>
+            <Card variant="default" style={{ padding: Spacing.lg }}>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 12 }}>
+                Splitmaro Pro Settings
+              </Text>
+              
+              <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '600', color: colors.textSecondary, marginBottom: 6 }}>
+                    PRO PRICE
+                  </Text>
+                  <TextInput
+                    style={[styles.inputField, { color: colors.text, backgroundColor: colors.surface, borderColor: colors.border, padding: 8, fontSize: 14 }]}
+                    value={adminPrice}
+                    onChangeText={setAdminPrice}
+                    keyboardType="numeric"
+                    placeholder="499"
+                    placeholderTextColor={colors.textTertiary}
+                  />
+                </View>
+
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '600', color: colors.textSecondary, marginBottom: 6 }}>
+                    CURRENCY
+                  </Text>
+                  <TextInput
+                    style={[styles.inputField, { color: colors.text, backgroundColor: colors.surface, borderColor: colors.border, padding: 8, fontSize: 14 }]}
+                    value={adminCurrency}
+                    onChangeText={setAdminCurrency}
+                    autoCapitalize="characters"
+                    placeholder="INR"
+                    placeholderTextColor={colors.textTertiary}
+                  />
+                </View>
+              </View>
+
+              <Pressable 
+                onPress={handleSavePricing} 
+                disabled={updatingConfig} 
+                style={({ pressed }) => [
+                  styles.saveBtn, 
+                  { 
+                    backgroundColor: colors.primary, 
+                    opacity: (updatingConfig || pressed) ? 0.7 : 1, 
+                    marginTop: 4, 
+                    paddingVertical: 10 
+                  }
+                ]}
+              >
+                <Text style={styles.saveBtnText}>
+                  {updatingConfig ? 'Saving...' : 'Update Splitmaro Pro Pricing'}
+                </Text>
+              </Pressable>
+            </Card>
+          </Animated.View>
+        )}
 
         {Platform.OS !== 'web' && (
           <Animated.View entering={FadeInDown.delay(400).springify()}>

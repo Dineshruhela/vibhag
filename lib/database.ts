@@ -47,6 +47,7 @@ export type User = {
   avatar_color: string;
   upi_id: string | null;
   is_pro: number;
+  is_admin: number;
   budget_amount: number | null;
   is_current_user: number;
   created_at: number;
@@ -67,6 +68,7 @@ export async function getCurrentUser(): Promise<User> {
       avatar_color: user.avatar_color,
       upi_id: user.upi_id ?? null,
       is_pro: user.is_pro ? 1 : 0,
+      is_admin: user.is_admin ? 1 : 0,
       budget_amount: user.budget_amount ? Number(user.budget_amount) : null,
       is_current_user: 1,
       created_at: Number(user.created_at),
@@ -88,6 +90,7 @@ export async function refreshCurrentUser(): Promise<User> {
       avatar_color: user.avatar_color,
       upi_id: user.upi_id ?? null,
       is_pro: user.is_pro ? 1 : 0,
+      is_admin: user.is_admin ? 1 : 0,
       budget_amount: user.budget_amount ? Number(user.budget_amount) : null,
       is_current_user: 1,
       created_at: Number(user.created_at),

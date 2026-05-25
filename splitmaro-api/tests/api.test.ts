@@ -334,4 +334,74 @@ describe('Splitmaro API Integration Tests', () => {
       expect(historyRes.body[0].status).toBe('success');
     });
   });
+
+  describe('Admin Configuration Integration Tests', () => {
+    let adminToken: string;
+
+    test('should prevent standard users from modifying dynamic pricing config', async () => {
+      const normalSignup = await request(API_URL)
+        .post('/auth/signup')
+        .send({
+          name: 'Regular Joe',
+          email: `joe-${Date.now()}@example.com`,
+          password: 'password123'
+        });
+
+      const normalToken = normalSignup.body.token;
+
+      const adminConfigRes = await request(API_URL)
+        .post('/api/admin/config')
+        .set('Authorization', `Bearer ${normalToken}`)
+        .send({
+          amount: 299,
+          currency: 'USD'
+        });
+
+      expect(adminConfigRes.status).toBe(403);
+      expect(adminConfigRes.body.error).toContain('Access denied');
+    });
+
+    test('should automatically assign admin permissions to users with configured admin email', async () => {
+      const signupRes = await request(API_URL)
+        .post('/auth/signup')
+        .send({
+          name: 'System Admin',
+          email: 'admin@splitmaro.com',
+          password: 'admin-password-123'
+        });
+
+      if (signupRes.status !== 200) {
+        const loginRes = await request(API_URL)
+          .post('/auth/login')
+          .send({
+            email: 'admin@splitmaro.com',
+            password: 'admin-password-123'
+          });
+        adminToken = loginRes.body.token;
+        expect(loginRes.body.user.is_admin).toBe(1);
+      } else {
+        adminToken = signupRes.body.token;
+        expect(signupRes.body.user.is_admin).toBe(1);
+      }
+    });
+
+    test('should allow authenticated admin to dynamically update upgrade price and currency', async () => {
+      const updateRes = await request(API_URL)
+        .post('/api/admin/config')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          amount: 799,
+          currency: 'EUR'
+        });
+
+      expect(updateRes.status).toBe(200);
+      expect(updateRes.body.success).toBe(true);
+
+      // Verify config was updated dynamically
+      const configRes = await request(API_URL).get('/api/payment/config');
+      expect(configRes.status).toBe(200);
+      expect(configRes.body.amount).toBe(799);
+      expect(configRes.body.currency).toBe('EUR');
+    });
+  });
 });

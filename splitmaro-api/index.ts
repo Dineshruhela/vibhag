@@ -52,8 +52,25 @@ app.use(express.static(path.join(__dirname, 'public')));
 };
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key-change-me';
-const PRO_UPGRADE_AMOUNT = Number(process.env.PRO_UPGRADE_AMOUNT || 499);
-const PRO_UPGRADE_CURRENCY = process.env.PRO_UPGRADE_CURRENCY || 'INR';
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'admin@splitmaro.com').toLowerCase().trim();
+
+async function getProUpgradeConfig() {
+  try {
+    const amountSetting = await prisma.systemSetting.findUnique({ where: { key: 'PRO_UPGRADE_AMOUNT' } });
+    const currencySetting = await prisma.systemSetting.findUnique({ where: { key: 'PRO_UPGRADE_CURRENCY' } });
+
+    return {
+      amount: amountSetting ? Number(amountSetting.value) : Number(process.env.PRO_UPGRADE_AMOUNT || 499),
+      currency: currencySetting ? currencySetting.value : (process.env.PRO_UPGRADE_CURRENCY || 'INR')
+    };
+  } catch (err) {
+    console.error('Failed to get dynamic settings, using environment defaults:', err);
+    return {
+      amount: Number(process.env.PRO_UPGRADE_AMOUNT || 499),
+      currency: process.env.PRO_UPGRADE_CURRENCY || 'INR'
+    };
+  }
+}
 
 // --- SOCKET.IO LOGIC ---
 io.on('connection', (socket) => {
@@ -172,6 +189,7 @@ app.post('/auth/signup', async (req, res) => {
             password_hash: passwordHash,
             push_token,
             referred_by: validReferralCode || existingUser.referred_by,
+            is_admin: normalizedEmail === ADMIN_EMAIL ? 1 : 0,
             updated_at: BigInt(Date.now())
           }
         });
@@ -203,6 +221,7 @@ app.post('/auth/signup', async (req, res) => {
         avatar_color: '#'+Math.floor(Math.random()*16777215).toString(16),
         push_token,
         referred_by: validReferralCode,
+        is_admin: normalizedEmail === ADMIN_EMAIL ? 1 : 0,
         created_at: BigInt(Date.now()),
         updated_at: BigInt(Date.now()),
       }
@@ -341,6 +360,10 @@ app.post('/auth/social', async (req, res) => {
         }
       }
 
+      if (normalizedEmail === ADMIN_EMAIL && existingUser.is_admin !== 1) {
+        dataToUpdate.is_admin = 1;
+      }
+
       let user = existingUser;
       if (Object.keys(dataToUpdate).length > 0) {
         dataToUpdate.updated_at = BigInt(Date.now());
@@ -377,6 +400,7 @@ app.post('/auth/social', async (req, res) => {
         avatar_color: color,
         push_token,
         referred_by: validReferralCode,
+        is_admin: normalizedEmail === ADMIN_EMAIL ? 1 : 0,
         created_at: BigInt(Date.now()),
         updated_at: BigInt(Date.now()),
       }
@@ -2157,10 +2181,51 @@ app.get('/api/users/me/total-spending-for-month', authenticateToken as any, asyn
 
 // --- PAYMENT INTEGRATION ENDPOINTS ---
 app.get('/api/payment/config', async (req, res) => {
+  const config = await getProUpgradeConfig();
   res.json({
-    amount: PRO_UPGRADE_AMOUNT,
-    currency: PRO_UPGRADE_CURRENCY
+    amount: config.amount,
+    currency: config.currency
   });
+});
+
+app.post('/api/admin/config', authenticateToken as any, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user.userId;
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user || user.is_admin !== 1) {
+      return res.status(403).json({ error: 'Access denied: Admin privileges required' });
+    }
+
+    const { amount, currency } = req.body;
+    if (amount !== undefined) {
+      const parsedAmount = Number(amount);
+      if (isNaN(parsedAmount) || parsedAmount < 1) {
+        return res.status(400).json({ error: 'Amount must be a valid number greater than or equal to 1' });
+      }
+      await prisma.systemSetting.upsert({
+        where: { key: 'PRO_UPGRADE_AMOUNT' },
+        update: { value: parsedAmount.toString(), updated_at: BigInt(Date.now()) },
+        create: { key: 'PRO_UPGRADE_AMOUNT', value: parsedAmount.toString(), updated_at: BigInt(Date.now()) }
+      });
+    }
+
+    if (currency !== undefined) {
+      const cleanCurrency = String(currency).trim().toUpperCase();
+      if (!cleanCurrency || cleanCurrency.length > 5) {
+        return res.status(400).json({ error: 'Currency code must be a valid 1-5 character string' });
+      }
+      await prisma.systemSetting.upsert({
+        where: { key: 'PRO_UPGRADE_CURRENCY' },
+        update: { value: cleanCurrency, updated_at: BigInt(Date.now()) },
+        create: { key: 'PRO_UPGRADE_CURRENCY', value: cleanCurrency, updated_at: BigInt(Date.now()) }
+      });
+    }
+
+    res.json({ success: true, message: 'Pricing configurations updated successfully' });
+  } catch (error) {
+    console.error('[Admin Config] Error updating settings:', error);
+    res.status(500).json({ error: String(error) });
+  }
 });
 
 app.post('/api/create-order', authenticateToken as any, async (req: AuthRequest, res) => {
@@ -2240,8 +2305,9 @@ app.post('/api/verify-payment', authenticateToken as any, async (req: AuthReques
       data: { is_pro: 1, updated_at: BigInt(Date.now()) }
     });
 
-    let purchaseAmount = PRO_UPGRADE_AMOUNT;
-    let purchaseCurrency = PRO_UPGRADE_CURRENCY;
+    const config = await getProUpgradeConfig();
+    let purchaseAmount = config.amount;
+    let purchaseCurrency = config.currency;
 
     if (!isSandbox) {
       try {
@@ -2774,8 +2840,9 @@ app.get('/api/payment/checkout', async (req, res) => {
     const apiBaseUrl = `${protocol}://${host}`;
     const escapedApiBase = JSON.stringify(apiBaseUrl).slice(1, -1);
 
+    const config = await getProUpgradeConfig();
     const currencySymbols: Record<string, string> = { INR: '₹', USD: '$', EUR: '€', GBP: '£' };
-    const currencySymbol = currencySymbols[PRO_UPGRADE_CURRENCY] || PRO_UPGRADE_CURRENCY;
+    const currencySymbol = currencySymbols[config.currency] || config.currency;
 
     const html = checkoutHtmlTemplate
       .replace('<%= token %>', escapedToken)
@@ -2783,9 +2850,9 @@ app.get('/api/payment/checkout', async (req, res) => {
       .replace('<%= name %>', escapedName)
       .replace('<%= email %>', escapedEmail)
       .replace('<%= apiBase %>', escapedApiBase)
-      .replace('<%= amount %>', PRO_UPGRADE_AMOUNT.toFixed(2))
-      .replace('<%= amountPaise %>', (PRO_UPGRADE_AMOUNT * 100).toString())
-      .replace('<%= currency %>', PRO_UPGRADE_CURRENCY)
+      .replace('<%= amount %>', config.amount.toFixed(2))
+      .replace('<%= amountPaise %>', (config.amount * 100).toString())
+      .replace('<%= currency %>', config.currency)
       .replace('<%= currencySymbol %>', currencySymbol);
 
     res.send(html);
