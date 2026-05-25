@@ -52,6 +52,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 };
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key-change-me';
+const PRO_UPGRADE_AMOUNT = Number(process.env.PRO_UPGRADE_AMOUNT || 499);
+const PRO_UPGRADE_CURRENCY = process.env.PRO_UPGRADE_CURRENCY || 'INR';
 
 // --- SOCKET.IO LOGIC ---
 io.on('connection', (socket) => {
@@ -2154,6 +2156,13 @@ app.get('/api/users/me/total-spending-for-month', authenticateToken as any, asyn
 });
 
 // --- PAYMENT INTEGRATION ENDPOINTS ---
+app.get('/api/payment/config', async (req, res) => {
+  res.json({
+    amount: PRO_UPGRADE_AMOUNT,
+    currency: PRO_UPGRADE_CURRENCY
+  });
+});
+
 app.post('/api/create-order', authenticateToken as any, async (req: AuthRequest, res) => {
   try {
     const { amount, currency, receipt } = req.body;
@@ -2231,8 +2240,8 @@ app.post('/api/verify-payment', authenticateToken as any, async (req: AuthReques
       data: { is_pro: 1, updated_at: BigInt(Date.now()) }
     });
 
-    let purchaseAmount = 499.0;
-    let purchaseCurrency = 'INR';
+    let purchaseAmount = PRO_UPGRADE_AMOUNT;
+    let purchaseCurrency = PRO_UPGRADE_CURRENCY;
 
     if (!isSandbox) {
       try {
@@ -2570,7 +2579,7 @@ const checkoutHtmlTemplate = `<!DOCTYPE html>
       
       <div class="price-box">
         <div class="price-label">One-Time Payment</div>
-        <div class="price-val">₹499.00</div>
+        <div class="price-val"><%= currencySymbol %><%= amount %></div>
       </div>
       
       <button class="btn" id="pay-btn" onclick="startPayment()">
@@ -2625,8 +2634,8 @@ const checkoutHtmlTemplate = `<!DOCTYPE html>
             'Authorization': 'Bearer ' + token
           },
           body: JSON.stringify({
-            amount: 49900,
-            currency: 'INR',
+            amount: <%= amountPaise %>,
+            currency: '<%= currency %>',
             receipt: 'receipt_upgrade_' + Date.now()
           })
         });
@@ -2765,12 +2774,19 @@ app.get('/api/payment/checkout', async (req, res) => {
     const apiBaseUrl = `${protocol}://${host}`;
     const escapedApiBase = JSON.stringify(apiBaseUrl).slice(1, -1);
 
+    const currencySymbols: Record<string, string> = { INR: '₹', USD: '$', EUR: '€', GBP: '£' };
+    const currencySymbol = currencySymbols[PRO_UPGRADE_CURRENCY] || PRO_UPGRADE_CURRENCY;
+
     const html = checkoutHtmlTemplate
       .replace('<%= token %>', escapedToken)
       .replace('<%= keyId %>', escapedKeyId)
       .replace('<%= name %>', escapedName)
       .replace('<%= email %>', escapedEmail)
-      .replace('<%= apiBase %>', escapedApiBase);
+      .replace('<%= apiBase %>', escapedApiBase)
+      .replace('<%= amount %>', PRO_UPGRADE_AMOUNT.toFixed(2))
+      .replace('<%= amountPaise %>', (PRO_UPGRADE_AMOUNT * 100).toString())
+      .replace('<%= currency %>', PRO_UPGRADE_CURRENCY)
+      .replace('<%= currencySymbol %>', currencySymbol);
 
     res.send(html);
   } catch (error) {

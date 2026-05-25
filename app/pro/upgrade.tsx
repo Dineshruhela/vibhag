@@ -16,8 +16,24 @@ import { apiRequest, api } from '../../lib/api';
 export default function UpgradeScreen() {
   const colors = useThemeColors();
   const router = useRouter();
+  const [price, setPrice] = useState(499);
+  const [currencySymbol, setCurrencySymbol] = useState('₹');
   const [loading, setLoading] = useState(false);
-  const price = 499;
+
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const config = await apiRequest('/api/payment/config');
+        if (config && config.amount) {
+          setPrice(config.amount);
+          const symbols: Record<string, string> = { INR: '₹', USD: '$', EUR: '€', GBP: '£' };
+          setCurrencySymbol(symbols[config.currency] || config.currency || '₹');
+        }
+      } catch (err) {
+        console.warn('[UpgradeScreen] Failed to fetch payment config:', err);
+      }
+    })();
+  }, []);
 
   React.useEffect(() => {
     // Listen for custom deep link event broadcast from root layout
@@ -146,7 +162,7 @@ export default function UpgradeScreen() {
             {loading ? (
               <Text style={styles.btnText}>Processing...</Text>
             ) : (
-              <Text style={styles.btnText}>Upgrade Now for ₹{price}</Text>
+              <Text style={styles.btnText}>Upgrade Now for {currencySymbol}{price}</Text>
             )}
           </Pressable>
         </Animated.View>
@@ -155,7 +171,7 @@ export default function UpgradeScreen() {
       <View style={[styles.footer, { borderTopColor: colors.borderLight }]}>
         <View style={styles.priceContainer}>
           <Text style={[styles.priceLabel, { color: colors.textTertiary }]}>ONE-TIME PAYMENT</Text>
-          <Text style={[styles.price, { color: colors.text }]}>₹499</Text>
+          <Text style={[styles.price, { color: colors.text }]}>{currencySymbol}{price}</Text>
         </View>
       </View>
     </SafeAreaView>

@@ -294,7 +294,21 @@ describe('Splitmaro API Integration Tests', () => {
       expect(historyRes.body.length).toBe(0);
     });
 
+    test('should fetch payment config successfully', async () => {
+      const configRes = await request(API_URL)
+        .get('/api/payment/config');
+
+      expect(configRes.status).toBe(200);
+      expect(configRes.body.amount).toBeDefined();
+      expect(configRes.body.currency).toBeDefined();
+    });
+
     test('should verify Sandbox payment and record purchase history logs', async () => {
+      // Fetch dynamic configurations
+      const configRes = await request(API_URL).get('/api/payment/config');
+      const expectedAmount = configRes.body.amount;
+      const expectedCurrency = configRes.body.currency;
+
       const paymentRes = await request(API_URL)
         .post('/api/verify-payment')
         .set('Authorization', `Bearer ${buyerToken}`)
@@ -315,8 +329,8 @@ describe('Splitmaro API Integration Tests', () => {
       expect(historyRes.status).toBe(200);
       expect(historyRes.body.length).toBe(1);
       expect(historyRes.body[0].provider).toBe('sandbox');
-      expect(historyRes.body[0].amount).toBe(499.0);
-      expect(historyRes.body[0].currency).toBe('INR');
+      expect(historyRes.body[0].amount).toBe(expectedAmount);
+      expect(historyRes.body[0].currency).toBe(expectedCurrency);
       expect(historyRes.body[0].status).toBe('success');
     });
   });
