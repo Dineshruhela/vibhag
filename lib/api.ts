@@ -1,10 +1,25 @@
 import * as SecureStore from 'expo-secure-store';
+import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 
 let rawApiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 // Strip leading/trailing double quotes if they exist in the env variable
 if (rawApiUrl.startsWith('"') && rawApiUrl.endsWith('"')) {
   rawApiUrl = rawApiUrl.slice(1, -1);
 }
+
+// Dynamically resolve localhost for native platforms to route to host computer's IP
+if (Platform.OS !== 'web' && (rawApiUrl.includes('localhost') || rawApiUrl.includes('127.0.0.1'))) {
+  const hostUri = Constants.expoConfig?.hostUri;
+  if (hostUri) {
+    const metroIp = hostUri.split(':')[0];
+    if (metroIp && metroIp !== 'localhost' && metroIp !== '127.0.0.1') {
+      rawApiUrl = rawApiUrl.replace('localhost', metroIp).replace('127.0.0.1', metroIp);
+      console.log(`[API] Dynamically resolved localhost to Metro host IP: ${rawApiUrl}`);
+    }
+  }
+}
+
 const API_URL = rawApiUrl;
 const TOKEN_KEY = '0b5b295c-1461-47fd-808f-822e827f39ca';
 
