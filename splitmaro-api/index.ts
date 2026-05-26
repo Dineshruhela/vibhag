@@ -2774,7 +2774,7 @@ const checkoutHtmlTemplate = `<!DOCTYPE html>
           amount: order.amount,
           currency: order.currency,
           name: "Splitmaro Pro",
-          description: "Upgrade to Splitmaro Pro 💎",
+          description: "Upgrade to Splitmaro Pro",
           order_id: order.order_id,
           handler: async function (response) {
             setStatus('Verifying payment signature...', 'info');
