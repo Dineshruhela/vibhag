@@ -29,7 +29,7 @@
       },
       "edgeToEdgeEnabled": true,
       "package": "com.dineshruhela.vibhag",
-      "versionCode": 2
+      "versionCode": 9
     },
     "web": {
       "bundler": "metro",
