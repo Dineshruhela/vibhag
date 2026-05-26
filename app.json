@@ -2,7 +2,7 @@
   "expo": {
     "name": "Splitmaro",
     "slug": "vibhag",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "splitmaro",
@@ -29,7 +29,7 @@
       },
       "edgeToEdgeEnabled": true,
       "package": "com.dineshruhela.vibhag",
-      "versionCode": 1
+      "versionCode": 2
     },
     "web": {
       "bundler": "metro",
