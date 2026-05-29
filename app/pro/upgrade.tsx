@@ -221,10 +221,10 @@ export default function UpgradeScreen() {
       <View style={[styles.footer, { borderTopColor: colors.borderLight }]}>
         <View style={styles.priceContainer}>
           <Text style={[styles.priceLabel, { color: colors.textTertiary }]}>
-            {Platform.OS === 'ios' ? 'SPECIAL PROMOTION' : 'ONE-TIME PAYMENT'}
+            ONE-TIME PAYMENT
           </Text>
           <Text style={[styles.price, { color: colors.text }]}>
-            {Platform.OS === 'ios' ? 'FREE' : `${currencySymbol}${price}`}
+            {`${currencySymbol}${price}`}
           </Text>
         </View>
       </View>
