@@ -9,6 +9,7 @@ import React, { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { addGroupMember, calculateGroupBalances, getAllFriends, getExpensePayers, getExpenseShares, getGroup, getGroupExpenses, getGroupMembers, removeGroupMember, updateExpense, type Group, type User } from '../../lib/database';
+import { formatCurrency } from '../../lib/format';
 
 export default function GroupMembersScreen() {
   const { groupId } = useLocalSearchParams<{ groupId: string }>();
@@ -18,6 +19,7 @@ export default function GroupMembersScreen() {
   const [group, setGroup] = useState<Group | null>(null);
   const [members, setMembers] = useState<User[]>([]);
   const [friends, setFriends] = useState<User[]>([]);
+  const [expenses, setExpenses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Split Options Modal State
@@ -29,14 +31,16 @@ export default function GroupMembersScreen() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [g, m, f] = await Promise.all([
+      const [g, m, f, e] = await Promise.all([
         getGroup(groupId!),
         getGroupMembers(groupId!),
-        getAllFriends()
+        getAllFriends(),
+        getGroupExpenses(groupId!)
       ]);
       setGroup(g);
       setMembers(m);
       setFriends(f);
+      setExpenses(e || []);
     } catch (e) {
       console.error(e);
     } finally {
@@ -45,6 +49,10 @@ export default function GroupMembersScreen() {
   };
 
   useEffect(() => { loadData(); }, [groupId]);
+
+  const groupCurrency = expenses.length > 0 ? expenses[0].currency || 'INR' : 'INR';
+  const currencySymbols: Record<string, string> = { INR: '₹', USD: '$', EUR: '€', GBP: '£' };
+  const currencySymbol = currencySymbols[groupCurrency] || groupCurrency;
 
   const handleAddMember = (friend: User) => {
     setSelectedFriend(friend);
@@ -129,9 +137,10 @@ export default function GroupMembersScreen() {
       if (Math.abs(balanceAmt) > 0.01) {
         setLoading(false);
         const formattedAmt = Math.abs(balanceAmt).toFixed(2);
+        const formattedCurrencyAmt = formatCurrency(Math.abs(balanceAmt), groupCurrency);
         const message = balanceAmt > 0
-          ? `${member.name} is still owed ₹${formattedAmt} in this group. Settle their balance before removing them.`
-          : `${member.name} still owes ₹${formattedAmt} in this group. Settle their balance before removing them.`;
+          ? `${member.name} is still owed ${formattedCurrencyAmt} in this group. Settle their balance before removing them.`
+          : `${member.name} still owes ${formattedCurrencyAmt} in this group. Settle their balance before removing them.`;
         
         Alert.alert('Cannot Remove Member', message, [
           { text: 'OK' },
@@ -144,7 +153,8 @@ export default function GroupMembersScreen() {
                   groupId,
                   fromId: balanceAmt < 0 ? member.id : undefined,
                   toId: balanceAmt > 0 ? member.id : undefined,
-                  amount: formattedAmt
+                  amount: formattedAmt,
+                  currency: groupCurrency
                 }
               });
             }
@@ -269,7 +279,7 @@ export default function GroupMembersScreen() {
 
             <Pressable onPress={() => setSplitType('amount')} style={[styles.optionRow, splitType === 'amount' && { borderColor: colors.primary, backgroundColor: colors.primary + '11' }]}>
               <Ionicons name={splitType === 'amount' ? "radio-button-on" : "radio-button-off"} size={20} color={splitType === 'amount' ? colors.primary : colors.textTertiary} />
-              <Text style={[styles.optionText, { color: colors.text }]}>Fixed Amount (₹)</Text>
+              <Text style={[styles.optionText, { color: colors.text }]}>Fixed Amount ({currencySymbol})</Text>
             </Pressable>
 
             {(splitType === 'percentage' || splitType === 'amount') && (

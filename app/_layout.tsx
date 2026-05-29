@@ -9,7 +9,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import * as Linking from 'expo-linking';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { DeviceEventEmitter } from 'react-native';
+import { DeviceEventEmitter, Platform } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors } from '@/constants/Colors';
@@ -61,8 +61,8 @@ export default function RootLayout() {
       console.log('[DeepLink] Received URL:', event.url);
       const parsed = Linking.parse(event.url);
       
-      // Check for splitmaro://pro-success
-      if (parsed.hostname === 'pro-success' || event.url.includes('pro-success')) {
+      // Check for splitmaro://pro-success (Android only, iOS has no Pro upgrade)
+      if (Platform.OS !== 'ios' && (parsed.hostname === 'pro-success' || event.url.includes('pro-success'))) {
         console.log('[DeepLink] Pro upgrade success detected, dismissing browser and emitting success...');
         WebBrowser.dismissBrowser();
         DeviceEventEmitter.emit('pro_upgrade_success');
@@ -200,6 +200,36 @@ export default function RootLayout() {
           options={{
             headerShown: false,
             animation: 'fade',
+          }}
+        />
+        <Stack.Screen
+          name="group/members"
+          options={{
+            presentation: 'modal',
+            headerShown: false,
+            animation: 'slide_from_bottom',
+          }}
+        />
+        <Stack.Screen
+          name="group/expense/[id]"
+          options={{
+            headerShown: false,
+            animation: 'slide_from_right',
+          }}
+        />
+        <Stack.Screen
+          name="pro/upgrade"
+          options={{
+            presentation: 'modal',
+            headerShown: false,
+            animation: 'slide_from_bottom',
+          }}
+        />
+        <Stack.Screen
+          name="admin/dashboard"
+          options={{
+            headerShown: false,
+            animation: 'slide_from_right',
           }}
         />
         <Stack.Screen name="+not-found" />

@@ -24,11 +24,8 @@ import {
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { api } from '../../lib/api';
-import { getCurrentUser } from '../../lib/database';
-type Balance = { userId: string; userName: string; avatarColor: string; amount: number };
-type Group = { id: string; name: string; category?: string; cover_image?: string; member_count: number };
-type User = { id: string; name: string; avatar_color: string };
+import { getAllGroups, getCurrentUser, getOverallBalance, type Group, type User } from '../../lib/database';
+type Balance = { userId: string; userName: string; avatarColor: string; avatarUrl?: string | null; amount: number };
 
 export default function DashboardScreen() {
   const colors = useThemeColors();
@@ -43,49 +40,17 @@ export default function DashboardScreen() {
 
   const loadData = useCallback(async () => {
     try {
-      // Pull from API only
-      const response = await api.pull(0); // Always get all data from server
-      const { users, groups, expenses, balancesByUser } = response.data || {};
-      // Find current user from token (if available)
-      const token = await api.getToken();
-      let cu = null;
-      if (token) {
-        try {
-          const payloadBase64 = token.split('.')[1];
-          const payload = JSON.parse(typeof atob !== 'undefined' ? atob(payloadBase64) : Buffer.from(payloadBase64, 'base64').toString('utf-8'));
-          
-          // 1. Try to find the user in the users array from the pull response
-          cu = users?.find((u: any) => u.id === payload.userId) || null;
-          
-          // 2. If not found in the sync result (e.g. new user), fetch from the local SQLite database
-          if (!cu) {
-            cu = await getCurrentUser();
-          }
-
-          // 3. Fallback: construct from JWT payload if SQLite query failed/empty
-          if (!cu) {
-            cu = {
-              id: payload.userId,
-              name: payload.name || payload.email?.split('@')[0] || 'You',
-              email: payload.email || '',
-              avatar_color: '#1CC29F',
-            };
-          }
-        } catch {}
-      }
+      const [cu, overallData, groupsData] = await Promise.all([
+        getCurrentUser(),
+        getOverallBalance(),
+        getAllGroups(),
+      ]);
       if (!cu) throw new Error('No user found');
       setCurrentUser(cu);
-      setGroups(groups || []);
-      // Calculate balances from API data if available
-      if (balancesByUser) {
-        setBalances(balancesByUser);
-        setTotalOwed(balancesByUser.reduce((sum: number, b: any) => sum + (b.amount > 0 ? b.amount : 0), 0));
-        setTotalOwe(balancesByUser.reduce((sum: number, b: any) => sum + (b.amount < 0 ? Math.abs(b.amount) : 0), 0));
-      } else {
-        setBalances([]);
-        setTotalOwed(0);
-        setTotalOwe(0);
-      }
+      setGroups(groupsData);
+      setBalances(overallData.balancesByUser);
+      setTotalOwed(overallData.totalOwed);
+      setTotalOwe(overallData.totalOwe);
     } catch (e) {
       setCurrentUser(null);
       Alert.alert('No User Found', 'No user exists in the app. Please sign in or create an account.');
@@ -154,6 +119,7 @@ export default function DashboardScreen() {
             color={currentUser?.avatar_color || colors.primary}
             size={38}
             fontSize={14}
+            avatarUrl={currentUser?.avatar_url}
           />
         </Pressable>
       </View>
@@ -328,7 +294,7 @@ export default function DashboardScreen() {
                     },
                   ]}
                 >
-                  <Avatar name={balance.userName} color={balance.avatarColor} size={42} fontSize={14} />
+                  <Avatar name={balance.userName} color={balance.avatarColor} size={42} fontSize={14} avatarUrl={balance.avatarUrl} />
                   <View style={styles.balancePersonInfo}>
                     <Text style={[styles.balancePersonName, { color: colors.text }]}>
                       {balance.userName}
@@ -423,9 +389,9 @@ export default function DashboardScreen() {
           <Animated.View entering={FadeInDown.delay(200).springify()}>
             <EmptyState
               icon="wallet-outline"
-              title="Welcome to Splitmaro!"
-              subtitle="Start by creating a group and adding expenses to split with friends."
-              actionLabel="Create a Group"
+              title="Your Splitmaro Dashboard"
+              subtitle="Create your first group, add friends, and start splitting expenses beautifully. Your balances, debts, and insights will appear right here."
+              actionLabel="Create Your First Group"
               onAction={() => router.push('/group/create')}
             />
           </Animated.View>

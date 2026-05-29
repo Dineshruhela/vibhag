@@ -113,7 +113,7 @@ export default function FriendsScreen() {
                   onPress={() => handleOptions(friend)}
                   style={[styles.row, i < filtered.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.borderLight }]}
                 >
-                  <Avatar name={friend.name} color={friend.avatar_color} size={44} />
+                  <Avatar name={friend.name} color={friend.avatar_color} size={44} avatarUrl={friend.avatar_url} />
                   <View style={styles.info}>
                     <Text style={[styles.name, { color: colors.text }]}>{friend.name}</Text>
                     {friend.email && <Text style={[styles.sub, { color: colors.textTertiary }]}>{friend.email}</Text>}

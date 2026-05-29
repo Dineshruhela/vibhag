@@ -13,10 +13,10 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, DeviceEventEmitter, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Alert, DeviceEventEmitter, Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { clearAllLocalData, clearLocalDatabase, getCurrentUser, updateUser, type User } from '../../lib/database';
+import { clearAllLocalData, clearLocalDatabase, getCurrentUser, refreshCurrentUser, updateUser, type User } from '../../lib/database';
 import { pullFromCloud } from '../../lib/sync';
 
 const UPI_REGEX = /^[a-zA-Z0-9._-]+@[a-zA-Z]{3,}$/;
@@ -34,11 +34,23 @@ export default function ProfileScreen() {
 
   const loadUser = async () => {
     try {
-      const u = await getCurrentUser();
-      if (!u) throw new Error('No user found');
-      setUser(u);
-      setName(u.name);
-      setUpiId(u.upi_id || '');
+      // 1. Load from cache first for instant UI response
+      const cachedUser = await getCurrentUser().catch(() => null);
+      if (cachedUser) {
+        setUser(cachedUser);
+        setName(cachedUser.name);
+        setUpiId(cachedUser.upi_id || '');
+      }
+
+      // 2. Fetch fresh profile from server in background to sync changes
+      const freshUser = await refreshCurrentUser().catch(() => null);
+      if (freshUser) {
+        setUser(freshUser);
+        setName(freshUser.name);
+        setUpiId(freshUser.upi_id || '');
+      } else if (!cachedUser) {
+        throw new Error('No user found');
+      }
     } catch {
       setUser(null);
       Alert.alert('No User Found', 'No user exists in the app. Please sign in or create an account.');
@@ -159,7 +171,7 @@ export default function ProfileScreen() {
         
         <Animated.View entering={FadeInDown.delay(100).springify()} style={[styles.header, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}> 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-            <Avatar name={user.name} color={user.avatar_color} size={80} fontSize={32} />
+            <Avatar name={user.name} color={user.avatar_color} size={80} fontSize={32} avatarUrl={user.avatar_url} />
             <Text style={[styles.title, { color: colors.text }]}>Your Profile</Text>
           </View>
           <Pressable onPress={handleRefresh} style={{ padding: 8, borderRadius: 20, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, marginLeft: 12 }}>
@@ -201,6 +213,7 @@ export default function ProfileScreen() {
           )}
         </Animated.View>
 
+        {Platform.OS !== 'ios' && (
         <Animated.View entering={FadeInDown.delay(250).springify()}>
           <Text style={[styles.label, { color: colors.textSecondary, marginTop: Spacing.xl }]}>SUBSCRIPTION</Text>
           <Card variant="default" padding={0} style={{ overflow: 'hidden' }}>
@@ -231,7 +244,9 @@ export default function ProfileScreen() {
             </View>
           </Card>
         </Animated.View>
+        )}
 
+        {Platform.OS !== 'ios' && (
         <Animated.View entering={FadeInDown.delay(270).springify()}>
           <Text style={[styles.label, { color: colors.textSecondary, marginTop: Spacing.xl }]}>GROWTH & VIRALITY</Text>
           <Card variant="default" padding={0} style={{ overflow: 'hidden' }}>
@@ -253,7 +268,9 @@ export default function ProfileScreen() {
             </Pressable>
           </Card>
         </Animated.View>
+        )}
 
+        {!user.avatar_url && (
         <Animated.View entering={FadeInDown.delay(300).springify()}>
           <Text style={[styles.label, { color: colors.textSecondary, marginTop: Spacing.xl }]}>AVATAR COLOR</Text>
           <Card variant="default" style={styles.colorCard}>
@@ -272,6 +289,7 @@ export default function ProfileScreen() {
             </View>
           </Card>
         </Animated.View>
+        )}
 
         {!!user.is_admin && (
           <Animated.View entering={FadeInDown.delay(350).springify()}>
@@ -346,13 +364,82 @@ export default function ProfileScreen() {
           </Card>
         </Animated.View>
 
-        <View style={{ height: 40 }} />
+        {/* About / App Info */}
+        <Animated.View entering={FadeInDown.delay(500).springify()}>
+          <Text style={[styles.label, { color: colors.textSecondary, marginTop: Spacing.xl }]}>ABOUT</Text>
+          <Card variant="default" padding={0} style={{ overflow: 'hidden' }}>
+            <View style={[styles.infoRow, { borderBottomWidth: 1, borderBottomColor: colors.borderLight }]}>
+              <View style={[styles.notifIcon, { backgroundColor: colors.primary + '20' }]}>
+                <Ionicons name="information-circle-outline" size={20} color={colors.primary} />
+              </View>
+              <View style={styles.infoTextContainer}>
+                <Text style={[styles.infoTitle, { color: colors.text }]}>Splitmaro</Text>
+                <Text style={[styles.infoSub, { color: colors.textTertiary }]}>Version 1.0.4</Text>
+              </View>
+            </View>
+            <Pressable
+              onPress={() => Linking.openURL('https://api.dineshruhela.com/privacy')}
+              style={[styles.infoRow, { borderBottomWidth: 1, borderBottomColor: colors.borderLight }]}
+            >
+              <View style={[styles.notifIcon, { backgroundColor: colors.primary + '20' }]}>
+                <Ionicons name="shield-checkmark-outline" size={20} color={colors.primary} />
+              </View>
+              <View style={styles.infoTextContainer}>
+                <Text style={[styles.infoTitle, { color: colors.text }]}>Privacy Policy</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+            </Pressable>
+            <Pressable
+              onPress={() => Linking.openURL('https://api.dineshruhela.com/terms')}
+              style={[styles.infoRow, { borderBottomWidth: 1, borderBottomColor: colors.borderLight }]}
+            >
+              <View style={[styles.notifIcon, { backgroundColor: colors.primary + '20' }]}>
+                <Ionicons name="document-text-outline" size={20} color={colors.primary} />
+              </View>
+              <View style={styles.infoTextContainer}>
+                <Text style={[styles.infoTitle, { color: colors.text }]}>Terms of Service</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+            </Pressable>
+            {Platform.OS === 'ios' && (
+              <Pressable
+                onPress={() => Linking.openURL('https://apps.apple.com/app/id6743184755?action=write-review')}
+                style={[styles.infoRow, { borderBottomWidth: 1, borderBottomColor: colors.borderLight }]}
+              >
+                <View style={[styles.notifIcon, { backgroundColor: '#FF9500' + '20' }]}>
+                  <Ionicons name="star-outline" size={20} color="#FF9500" />
+                </View>
+                <View style={styles.infoTextContainer}>
+                  <Text style={[styles.infoTitle, { color: colors.text }]}>Rate on App Store</Text>
+                  <Text style={[styles.infoSub, { color: colors.textTertiary }]}>Help us by leaving a review</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+              </Pressable>
+            )}
+            <Pressable
+              onPress={() => Linking.openURL('https://api.dineshruhela.com/support')}
+              style={styles.infoRow}
+            >
+              <View style={[styles.notifIcon, { backgroundColor: colors.primary + '20' }]}>
+                <Ionicons name="mail-outline" size={20} color={colors.primary} />
+              </View>
+              <View style={styles.infoTextContainer}>
+                <Text style={[styles.infoTitle, { color: colors.text }]}>Contact Support</Text>
+                <Text style={[styles.infoSub, { color: colors.textTertiary }]}>support@splitmaro.com</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+            </Pressable>
+          </Card>
+        </Animated.View>
+
+        <View style={{ alignItems: 'center', marginTop: Spacing.xl, marginBottom: Spacing.md }}>
+          <Text style={{ color: colors.textTertiary, fontSize: 12 }}>Made with ❤️ by Dinesh Ruhela</Text>
+        </View>
+
+        <View style={{ height: 20 }} />
         
         <Pressable onPress={handleDeleteAccount} style={styles.deleteBtn}>
-          <Text style={styles.deleteBtnText}>Delete Account & Data</Text>
-        </Pressable>
-        <Pressable onPress={handleClearAllLocal} style={[styles.deleteBtn, { marginTop: 8, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.negative }] }>
-          <Text style={[styles.deleteBtnText, { color: colors.negative }]}>Clear All Local Data</Text>
+          <Text style={styles.deleteBtnText}>Delete Account</Text>
         </Pressable>
 
         <View style={{ height: 40 }} />

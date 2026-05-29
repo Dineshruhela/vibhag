@@ -5,6 +5,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AvatarColors } from '../constants/Colors';
 import { api, apiRequest } from './api';
+export { apiRequest };
 
 const getApiUrl = () => {
   let url = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
@@ -45,6 +46,7 @@ export type User = {
   email: string | null;
   phone: string | null;
   avatar_color: string;
+  avatar_url: string | null;
   upi_id: string | null;
   is_pro: number;
   is_admin: number;
@@ -66,6 +68,7 @@ export async function getCurrentUser(): Promise<User> {
       email: user.email ?? null,
       phone: user.phone ?? null,
       avatar_color: user.avatar_color,
+      avatar_url: user.avatar_url ?? null,
       upi_id: user.upi_id ?? null,
       is_pro: user.is_pro ? 1 : 0,
       is_admin: user.is_admin ? 1 : 0,
@@ -88,6 +91,7 @@ export async function refreshCurrentUser(): Promise<User> {
       email: user.email ?? null,
       phone: user.phone ?? null,
       avatar_color: user.avatar_color,
+      avatar_url: user.avatar_url ?? null,
       upi_id: user.upi_id ?? null,
       is_pro: user.is_pro ? 1 : 0,
       is_admin: user.is_admin ? 1 : 0,
@@ -111,6 +115,7 @@ export async function setupLocalUserFromAuth(serverUser: {
   email?: string | null;
   phone?: string | null;
   avatar_color: string;
+  avatar_url?: string | null;
   upi_id?: string | null;
   is_pro?: number | boolean;
   budget_amount?: number | null;
@@ -123,8 +128,10 @@ export async function setupLocalUserFromAuth(serverUser: {
     email: serverUser.email ?? null,
     phone: serverUser.phone ?? null,
     avatar_color: serverUser.avatar_color,
+    avatar_url: serverUser.avatar_url ?? null,
     upi_id: serverUser.upi_id ?? null,
     is_pro: serverUser.is_pro ? 1 : 0,
+    is_admin: (serverUser as any).is_admin ? 1 : 0,
     budget_amount: serverUser.budget_amount ? Number(serverUser.budget_amount) : null,
     is_current_user: 1,
     created_at: serverUser.created_at ? Number(serverUser.created_at) : Date.now(),
@@ -158,8 +165,10 @@ export async function getUser(id: string): Promise<User | null> {
       email: u.email ?? null,
       phone: u.phone ?? null,
       avatar_color: u.avatar_color,
+      avatar_url: u.avatar_url ?? null,
       upi_id: u.upi_id ?? null,
       is_pro: u.is_pro ? 1 : 0,
+      is_admin: u.is_admin ? 1 : 0,
       budget_amount: u.budget_amount ? Number(u.budget_amount) : null,
       is_current_user: currentUser && currentUser.id === u.id ? 1 : 0,
       created_at: Number(u.created_at),
@@ -180,8 +189,10 @@ export async function getAllFriends(): Promise<User[]> {
       email: u.email ?? null,
       phone: u.phone ?? null,
       avatar_color: u.avatar_color,
+      avatar_url: u.avatar_url ?? null,
       upi_id: u.upi_id ?? null,
       is_pro: u.is_pro ? 1 : 0,
+      is_admin: u.is_admin ? 1 : 0,
       budget_amount: u.budget_amount ? Number(u.budget_amount) : null,
       is_current_user: 0,
       created_at: Number(u.created_at),
@@ -214,8 +225,10 @@ export async function addFriend(name: string, email?: string, phone?: string, av
     email: friend.email ?? null,
     phone: friend.phone ?? null,
     avatar_color: friend.avatar_color,
+    avatar_url: friend.avatar_url ?? null,
     upi_id: friend.upi_id ?? null,
     is_pro: friend.is_pro ? 1 : 0,
+    is_admin: friend.is_admin ? 1 : 0,
     budget_amount: friend.budget_amount ? Number(friend.budget_amount) : null,
     is_current_user: 0,
     created_at: Number(friend.created_at),
@@ -241,6 +254,7 @@ export async function updateUser(
       email: updated.email !== undefined ? updated.email : currentUser.email,
       phone: updated.phone !== undefined ? updated.phone : currentUser.phone,
       avatar_color: updated.avatar_color ?? currentUser.avatar_color,
+      avatar_url: updated.avatar_url ?? currentUser.avatar_url ?? null,
       upi_id: updated.upi_id !== undefined ? updated.upi_id : currentUser.upi_id,
       is_pro: updated.is_pro ? 1 : 0,
       budget_amount: updated.budget_amount !== undefined ? (updated.budget_amount ? Number(updated.budget_amount) : null) : currentUser.budget_amount,
@@ -374,6 +388,7 @@ export async function getGroupMembers(groupId: string): Promise<User[]> {
       avatar_color: u.avatar_color,
       upi_id: u.upi_id ?? null,
       is_pro: u.is_pro ? 1 : 0,
+      is_admin: u.is_admin ? 1 : 0,
       budget_amount: u.budget_amount ? Number(u.budget_amount) : null,
       is_current_user: currentUser && currentUser.id === u.id ? 1 : 0,
       created_at: Number(u.created_at),
@@ -659,6 +674,7 @@ export type Balance = {
   userName: string;
   userEmail?: string;
   avatarColor: string;
+  avatarUrl?: string | null;
   amount: number;
 };
 
@@ -677,6 +693,7 @@ export async function calculateGroupBalances(groupId: string): Promise<Balance[]
       userName: b.userName,
       userEmail: b.userEmail ?? undefined,
       avatarColor: b.avatarColor,
+      avatarUrl: b.avatarUrl ?? null,
       amount: b.amount,
     }));
   } catch (e) {
@@ -698,6 +715,7 @@ export async function getSimplifiedDebts(groupId: string): Promise<DebtEdge[]> {
         avatar_color: d.from.avatar_color,
         upi_id: d.from.upi_id ?? null,
         is_pro: d.from.is_pro ? 1 : 0,
+        is_admin: d.from.is_admin ? 1 : 0,
         budget_amount: d.from.budget_amount ? Number(d.from.budget_amount) : null,
         is_current_user: 0,
         created_at: Number(d.from.created_at),
@@ -710,6 +728,7 @@ export async function getSimplifiedDebts(groupId: string): Promise<DebtEdge[]> {
         avatar_color: d.to.avatar_color,
         upi_id: d.to.upi_id ?? null,
         is_pro: d.to.is_pro ? 1 : 0,
+        is_admin: d.to.is_admin ? 1 : 0,
         budget_amount: d.to.budget_amount ? Number(d.to.budget_amount) : null,
         is_current_user: 0,
         created_at: Number(d.to.created_at),
@@ -735,6 +754,7 @@ export async function getOverallBalance(): Promise<{ totalOwed: number; totalOwe
         userId: b.userId,
         userName: b.userName,
         avatarColor: b.avatarColor,
+        avatarUrl: b.avatarUrl ?? null,
         amount: b.amount,
       })),
     };

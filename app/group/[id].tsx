@@ -82,6 +82,7 @@ export default function GroupDetailScreen() {
   }, [load]);
 
   const myBalance = balances.find(b => b.userId === currentUser?.id);
+  const groupCurrency = expenses.length > 0 ? expenses[0].currency || 'INR' : 'INR';
   const cat = GroupCategoryColors[group?.category || 'other'] || GroupCategoryColors.other;
 
   const handleDeleteGroup = () => {
@@ -136,7 +137,7 @@ export default function GroupDetailScreen() {
           { text: 'Not Now', style: 'cancel' },
           { text: 'Yes, Record it', onPress: () => router.push({ 
             pathname: '/group/settle', 
-            params: { groupId: id, fromId: currentUser?.id, toId: toUser.id, amount: String(amount) } 
+            params: { groupId: id, fromId: currentUser?.id, toId: toUser.id, amount: String(amount), currency: groupCurrency } 
           }) }
         ]);
       } else {
@@ -153,7 +154,7 @@ export default function GroupDetailScreen() {
     const sorted = [...balances].sort((a, b) => b.amount - a.amount);
     sorted.forEach(m => {
       if (Math.abs(m.amount) > 0.01) {
-        msg += `${m.userName}: ${m.amount > 0 ? 'Gets back' : 'Owes'} ${formatCurrency(Math.abs(m.amount))}\n`;
+        msg += `${m.userName}: ${m.amount > 0 ? 'Gets back' : 'Owes'} ${formatCurrency(Math.abs(m.amount), groupCurrency)}\n`;
       }
     });
     msg += `\nTracked with Splitmaro app.`;
@@ -201,9 +202,19 @@ export default function GroupDetailScreen() {
           <Pressable onPress={handleShare} hitSlop={12} style={{ marginRight: 16 }}>
             <Ionicons name="share-outline" size={22} color={colors.text} />
           </Pressable>
-          <Pressable onPress={exportCSV} style={styles.shareBtn}>
+          <Pressable onPress={exportCSV} hitSlop={12} style={{ marginRight: 16 }}>
             <Ionicons name="download-outline" size={20} color={colors.textSecondary} />
-            <Text style={[styles.shareText, { color: colors.textSecondary }]}>Export</Text>
+          </Pressable>
+          <Pressable 
+            onPress={() => {
+              Alert.alert(group.name, 'Group options', [
+                { text: 'Delete Group', style: 'destructive', onPress: handleDeleteGroup },
+                { text: 'Cancel', style: 'cancel' },
+              ]);
+            }} 
+            hitSlop={12}
+          >
+            <Ionicons name="ellipsis-vertical" size={20} color={colors.textSecondary} />
           </Pressable>
         </View>
       </View>
@@ -218,13 +229,13 @@ export default function GroupDetailScreen() {
             }]}>
               {!myBalance || Math.abs(myBalance.amount) < 0.01
                 ? 'Settled up ✓'
-                : `${myBalance.amount > 0 ? '+' : '-'}${formatCurrency(Math.abs(myBalance.amount))}`}
+                : `${myBalance.amount > 0 ? '+' : '-'}${formatCurrency(Math.abs(myBalance.amount), groupCurrency)}`}
             </Text>
           </View>
           <Pressable style={styles.membersRow} onPress={() => router.push({ pathname: '/group/members', params: { groupId: group.id } })}>
             {members.slice(0, 4).map((m, i) => (
               <View key={m.id} style={[styles.miniAvatar, { marginLeft: i > 0 ? -8 : 0 }]}>
-                <Avatar name={m.name} color={m.avatar_color} size={28} fontSize={10} />
+                <Avatar name={m.name} color={m.avatar_color} size={28} fontSize={10} avatarUrl={m.avatar_url} />
               </View>
             ))}
             {members.length > 4 && (
@@ -303,14 +314,14 @@ export default function GroupDetailScreen() {
                           )}
                         </View>
                         <Text style={[styles.expMeta, { color: colors.textTertiary }]}>
-                          {exp.creator_name || 'You'} paid {formatCurrency(exp.amount)} · {formatRelativeTime(exp.created_at)}
+                          {exp.creator_name || 'You'} paid {formatCurrency(exp.amount, exp.currency || 'INR')} · {formatRelativeTime(exp.created_at)}
                         </Text>
                       </View>
                       <View style={styles.expRight}>
                         {Math.abs(net) > 0.01 ? (
                           <>
                             <Text style={[styles.expLabel, { color: net > 0 ? colors.primary : colors.negative }]}>{net > 0 ? 'you lent' : 'you owe'}</Text>
-                            <Text style={[styles.expAmt, { color: net > 0 ? colors.primary : colors.negative }]}>{formatCurrency(Math.abs(net))}</Text>
+                            <Text style={[styles.expAmt, { color: net > 0 ? colors.primary : colors.negative }]}>{formatCurrency(Math.abs(net), exp.currency || 'INR')}</Text>
                           </>
                         ) : (
                           <Text style={[styles.expLabel, { color: colors.textTertiary }]}>not involved</Text>
@@ -334,13 +345,13 @@ export default function GroupDetailScreen() {
             <Card variant="default" padding={0} style={{ marginBottom: 16 }}>
               {balances.map((b, i) => (
                 <View key={b.userId} style={[styles.balRow, i < balances.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.borderLight }]}>
-                  <Avatar name={b.userName} color={b.avatarColor} size={36} fontSize={12} />
+                  <Avatar name={b.userName} color={b.avatarColor} size={36} fontSize={12} avatarUrl={b.avatarUrl} />
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>{b.userName}</Text>
                     {b.userEmail && <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 2 }}>{b.userEmail}</Text>}
                   </View>
                   <Text style={[styles.balAmt, { color: Math.abs(b.amount) < 0.01 ? colors.textTertiary : b.amount > 0 ? colors.primary : colors.negative }]}>
-                    {Math.abs(b.amount) < 0.01 ? 'settled' : `${b.amount > 0 ? '+' : '-'}${formatCurrency(Math.abs(b.amount))}`}
+                    {Math.abs(b.amount) < 0.01 ? 'settled' : `${b.amount > 0 ? '+' : '-'}${formatCurrency(Math.abs(b.amount), groupCurrency)}`}
                   </Text>
                 </View>
               ))}
@@ -356,13 +367,13 @@ export default function GroupDetailScreen() {
                     <Animated.View key={i} entering={FadeInDown.delay(i * 80).springify()}>
                       <Card variant="outlined" style={{ marginBottom: 8 }}>
                         <View style={styles.debtRow}>
-                          <Avatar name={d.from.name} color={d.from.avatar_color} size={32} fontSize={11} />
+                          <Avatar name={d.from.name} color={d.from.avatar_color} size={32} fontSize={11} avatarUrl={d.from.avatar_url} />
                           <View style={styles.debtInfo}>
                             <Text style={[styles.debtText, { color: colors.text }]}>
                               <Text style={{ fontWeight: '700' }}>{d.from.name}</Text> pays{' '}
                               <Text style={{ fontWeight: '700' }}>{d.to.name}</Text>
                             </Text>
-                            <Text style={[styles.debtAmt, { color: colors.primary }]}>{formatCurrency(d.amount)}</Text>
+                            <Text style={[styles.debtAmt, { color: colors.primary }]}>{formatCurrency(d.amount, groupCurrency)}</Text>
                           </View>
                           <View style={{ flexDirection: 'row', gap: 8 }}>
                             {isIOWE && d.to.upi_id && (
@@ -376,7 +387,7 @@ export default function GroupDetailScreen() {
                             )}
                             <Pressable
                               style={[styles.settleBtn, { backgroundColor: colors.primary }]}
-                              onPress={() => router.push({ pathname: '/group/settle', params: { groupId: id, fromId: d.from.id, toId: d.to.id, amount: String(d.amount) } })}
+                              onPress={() => router.push({ pathname: '/group/settle', params: { groupId: id, fromId: d.from.id, toId: d.to.id, amount: String(d.amount), currency: groupCurrency } })}
                             >
                               <Text style={styles.settleBtnText}>Settle</Text>
                             </Pressable>

@@ -13,8 +13,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { createSettlement } from '../../lib/database';
 
 export default function SettleScreen() {
-  const { groupId, fromId, toId, amount: suggestedAmount } = useLocalSearchParams<{
-    groupId: string; fromId: string; toId: string; amount: string;
+  const { groupId, fromId, toId, amount: suggestedAmount, currency: searchCurrency } = useLocalSearchParams<{
+    groupId: string; fromId: string; toId: string; amount: string; currency: string;
   }>();
   const colors = useThemeColors();
   const router = useRouter();
@@ -22,12 +22,16 @@ export default function SettleScreen() {
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
 
+  const currency = searchCurrency || 'INR';
+  const currencySymbols: Record<string, string> = { INR: '₹', USD: '$', EUR: '€', GBP: '£' };
+  const currencySymbol = currencySymbols[currency] || currency;
+
   const handleSettle = async () => {
     const amt = parseFloat(amount);
     const maxAmt = suggestedAmount ? parseFloat(suggestedAmount) : null;
     if (!amt || amt <= 0 || isNaN(amt)) { Alert.alert('Error', 'Enter a valid amount.'); return; }
     if (maxAmt !== null && !isNaN(maxAmt) && amt > maxAmt + 0.01) {
-      Alert.alert('Invalid Amount', `Maximum settlement amount is ${formatCurrency(maxAmt)}.`);
+      Alert.alert('Invalid Amount', `Maximum settlement amount is ${formatCurrency(maxAmt, currency)}.`);
       return;
     }
     setSaving(true);
@@ -55,7 +59,7 @@ export default function SettleScreen() {
 
       <View style={styles.content}>
         <View style={[styles.amountBox, { backgroundColor: colors.surface }]}>
-          <Text style={[styles.currency, { color: colors.primary }]}>₹</Text>
+          <Text style={[styles.currency, { color: colors.primary }]}>{currencySymbol}</Text>
           <TextInput
             style={[styles.amountInput, { color: colors.text }]}
             placeholder="0.00"

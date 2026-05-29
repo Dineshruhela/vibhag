@@ -6,7 +6,7 @@ import { useThemeColors } from '@/hooks/useThemeColor';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, DeviceEventEmitter, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, DeviceEventEmitter, Pressable, ScrollView, StyleSheet, Text, View, Platform } from 'react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
@@ -19,6 +19,13 @@ export default function UpgradeScreen() {
   const [price, setPrice] = useState(499);
   const [currencySymbol, setCurrencySymbol] = useState('₹');
   const [loading, setLoading] = useState(false);
+
+  // iOS: All features are free — redirect back if user somehow reaches this screen
+  React.useEffect(() => {
+    if (Platform.OS === 'ios') {
+      router.back();
+    }
+  }, [router]);
 
   React.useEffect(() => {
     (async () => {
@@ -67,6 +74,20 @@ export default function UpgradeScreen() {
   const handleUpgrade = async () => {
     setLoading(true);
     try {
+      if (Platform.OS === 'ios') {
+        const res = await apiRequest('/api/payment/upgrade-free', { method: 'POST' });
+        if (res && res.success) {
+          await refreshCurrentUser();
+          DeviceEventEmitter.emit('auth_change');
+          Alert.alert('Splitmaro Pro Activated! 💎', 'Enjoy unlimited groups, recurring expenses, budget alerts, and all other premium features.', [
+            { text: 'Awesome!', onPress: () => router.back() }
+          ]);
+        } else {
+          throw new Error(res.error || 'Failed to activate Pro status');
+        }
+        return;
+      }
+
       console.log('[UpgradeScreen] Fetching token for checkout...');
       const token = await api.getToken();
       if (!token) {
@@ -162,7 +183,9 @@ export default function UpgradeScreen() {
             {loading ? (
               <Text style={styles.btnText}>Processing...</Text>
             ) : (
-              <Text style={styles.btnText}>Upgrade Now for {currencySymbol}{price}</Text>
+              <Text style={styles.btnText}>
+                {Platform.OS === 'ios' ? 'Unlock Premium Features' : `Upgrade Now for ${currencySymbol}${price}`}
+              </Text>
             )}
           </Pressable>
         </Animated.View>
@@ -170,8 +193,12 @@ export default function UpgradeScreen() {
 
       <View style={[styles.footer, { borderTopColor: colors.borderLight }]}>
         <View style={styles.priceContainer}>
-          <Text style={[styles.priceLabel, { color: colors.textTertiary }]}>ONE-TIME PAYMENT</Text>
-          <Text style={[styles.price, { color: colors.text }]}>{currencySymbol}{price}</Text>
+          <Text style={[styles.priceLabel, { color: colors.textTertiary }]}>
+            {Platform.OS === 'ios' ? 'SPECIAL PROMOTION' : 'ONE-TIME PAYMENT'}
+          </Text>
+          <Text style={[styles.price, { color: colors.text }]}>
+            {Platform.OS === 'ios' ? 'FREE' : `${currencySymbol}${price}`}
+          </Text>
         </View>
       </View>
     </SafeAreaView>

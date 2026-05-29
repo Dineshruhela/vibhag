@@ -8,7 +8,7 @@ import { useThemeColors } from '@/hooks/useThemeColor';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { createGroup, getAllFriends, getCurrentUser, getGroupsCount, type User } from '../../lib/database';
 
@@ -39,7 +39,7 @@ export default function CreateGroupScreen() {
     try {
       const [count, user] = await Promise.all([getGroupsCount(), getCurrentUser()]);
       
-      if (count >= 3 && !user.is_pro) {
+      if (Platform.OS !== 'ios' && count >= 3 && !user.is_pro) {
         setSaving(false);
         Alert.alert(
           'Limit Reached',

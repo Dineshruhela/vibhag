@@ -39,6 +39,7 @@ import {
 } from '../../lib/database';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
+const currencySymbol = formatCurrency(0).replace(/[0-9.,\s]/g, '').trim() || '₹';
 
 type Tab = 'feed' | 'stats';
 
@@ -144,7 +145,7 @@ export default function ActivityScreen() {
   }, [loadData]);
 
   // Reload stats when month changes
-  useMemo(() => { loadStats(); }, [selectedMonth, selectedYear]);
+  useEffect(() => { loadStats(); }, [selectedMonth, selectedYear]);
 
   const filteredExpenses = useMemo(() => {
     const base = expenses.filter(e => e.id !== pendingDeleteId);
@@ -347,7 +348,7 @@ export default function ActivityScreen() {
             </View>
             {editingBudget ? (
               <View style={[styles.budgetInputRow, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}>
-                <Text style={{ color: colors.primary, fontSize: 18, fontWeight: '800' }}>₹</Text>
+                <Text style={{ color: colors.primary, fontSize: 18, fontWeight: '800' }}>{currencySymbol}</Text>
                 <TextInput
                   style={[styles.budgetInput, { color: colors.text }]}
                   placeholder="e.g. 15000"
@@ -381,7 +382,7 @@ export default function ActivityScreen() {
                       {pct.toFixed(0)}% used
                     </Text>
                     <Text style={{ color: remaining > 0 ? colors.primary : '#FF3B30', fontSize: 13, fontWeight: '600' }}>
-                      {remaining > 0 ? `₹${remaining.toFixed(0)} remaining` : 'Over budget!'}
+                      {remaining > 0 ? `${formatCurrency(remaining)} remaining` : 'Over budget!'}
                     </Text>
                   </View>
                   {pct >= 80 && pct < 100 && (
@@ -420,7 +421,7 @@ export default function ActivityScreen() {
                 data={barChartData}
                 width={SCREEN_WIDTH - Spacing.base * 4}
                 height={180}
-                yAxisLabel="₹"
+                yAxisLabel={currencySymbol}
                 yAxisSuffix=""
                 chartConfig={{
                   backgroundColor: 'transparent',

@@ -13,6 +13,7 @@ model User {
   email           String?  @unique
   phone           String?
   avatar_color    String
+  avatar_url      String?
   upi_id          String?
   is_pro          Int      @default(0)
   is_admin        Int      @default(0)

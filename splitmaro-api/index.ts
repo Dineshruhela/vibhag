@@ -39,9 +39,21 @@ app.use(express.json({ limit: '10mb' }));
 app.get('/', (req, res) => {
   const host = req.headers.host || '';
   if (host.includes('api.dineshruhela.com')) {
-    return res.send('🚀 Splitmaro API is running successfully.');
+    return res.sendFile(path.join(__dirname, 'public', 'index.html'));
   }
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.get('/privacy', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'privacy.html'));
+});
+
+app.get('/terms', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'terms.html'));
+});
+
+app.get('/support', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'support.html'));
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
@@ -139,14 +151,21 @@ async function checkReferralReward(referrerId: string) {
 
 // --- AUTH ROUTES ---
 
-// --- PASSWORD RESET ROUTE ---
+// --- PASSWORD RESET ROUTE (requires authentication) ---
 app.post('/auth/reset-password', async (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password) return res.status(400).json({ error: 'Missing required fields' });
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
 
-  const normalizedEmail = email.toLowerCase().trim();
   try {
-    const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    
+    const { password } = req.body;
+    if (!password) return res.status(400).json({ error: 'Missing password field' });
+
+    const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     const passwordHash = await bcrypt.hash(password, 10);
@@ -268,6 +287,7 @@ app.post('/auth/social', async (req, res) => {
   try {
     let verifiedEmail: string;
     let verifiedName: string;
+    let verifiedAvatarUrl: string | null = null;
 
     if (idToken.startsWith('mock-')) {
       verifiedEmail = idToken.replace('mock-', '');
@@ -299,6 +319,7 @@ app.post('/auth/social', async (req, res) => {
       }
       verifiedEmail = payload.email;
       verifiedName = payload.name || fullName || payload.email;
+      verifiedAvatarUrl = payload.picture || null;
     } else if (provider === 'apple') {
       let actualAud: string = 'unknown';
       try {
@@ -340,8 +361,8 @@ app.post('/auth/social', async (req, res) => {
     if (existingUser) {
       const dataToUpdate: any = {};
       
-      // Update name if it's currently empty, matches email, or if it was a placeholder friend
-      if (!existingUser.name || existingUser.name === existingUser.email) {
+      // Update name if different or matches email/placeholder
+      if (verifiedName && (existingUser.name !== verifiedName || !existingUser.name || existingUser.name === existingUser.email)) {
         dataToUpdate.name = verifiedName;
       }
       if (avatar_color && (!existingUser.avatar_color || existingUser.avatar_color === '#95A5A6')) {
@@ -349,6 +370,9 @@ app.post('/auth/social', async (req, res) => {
       }
       if (push_token && existingUser.push_token !== push_token) {
         dataToUpdate.push_token = push_token;
+      }
+      if (verifiedAvatarUrl && existingUser.avatar_url !== verifiedAvatarUrl) {
+        dataToUpdate.avatar_url = verifiedAvatarUrl;
       }
 
       let validReferralCode = null;
@@ -398,6 +422,7 @@ app.post('/auth/social', async (req, res) => {
         email: normalizedEmail,
         password_hash: null, // Social user, no password hash
         avatar_color: color,
+        avatar_url: verifiedAvatarUrl,
         push_token,
         referred_by: validReferralCode,
         is_admin: normalizedEmail === ADMIN_EMAIL ? 1 : 0,
@@ -975,6 +1000,7 @@ async function getGroupBalances(groupId: string) {
     userName: m.user.name,
     userEmail: m.user.email || undefined,
     avatarColor: m.user.avatar_color,
+    avatarUrl: m.user.avatar_url,
     amount: Math.round(balanceMap[m.user_id] * 100) / 100
   }));
 }
@@ -1034,7 +1060,7 @@ async function getOverallBalanceBackend(currentUserId: string) {
   });
   const groupIds = memberships.map(m => m.group_id);
 
-  const userBalanceMap: Record<string, { name: string; color: string; amount: number }> = {};
+  const userBalanceMap: Record<string, { name: string; color: string; avatarUrl: string | null; amount: number }> = {};
 
   for (const groupId of groupIds) {
     const balances = await getGroupBalances(groupId);
@@ -1046,13 +1072,13 @@ async function getOverallBalanceBackend(currentUserId: string) {
       if (debt.from.id === currentUserId) {
         const key = debt.to.id;
         if (!userBalanceMap[key]) {
-          userBalanceMap[key] = { name: debt.to.name, color: debt.to.avatar_color, amount: 0 };
+          userBalanceMap[key] = { name: debt.to.name, color: debt.to.avatar_color, avatarUrl: debt.to.avatar_url, amount: 0 };
         }
         userBalanceMap[key].amount -= debt.amount;
       } else if (debt.to.id === currentUserId) {
         const key = debt.from.id;
         if (!userBalanceMap[key]) {
-          userBalanceMap[key] = { name: debt.from.name, color: debt.from.avatar_color, amount: 0 };
+          userBalanceMap[key] = { name: debt.from.name, color: debt.from.avatar_color, avatarUrl: debt.from.avatar_url, amount: 0 };
         }
         userBalanceMap[key].amount += debt.amount;
       }
@@ -1072,6 +1098,7 @@ async function getOverallBalanceBackend(currentUserId: string) {
         userId,
         userName: data.name,
         avatarColor: data.color,
+        avatarUrl: data.avatarUrl,
         amount: Math.round(data.amount * 100) / 100
       });
     }
@@ -1138,6 +1165,7 @@ app.get('/api/referrals/stats', authenticateToken as any, async (req: AuthReques
         name: true,
         email: true,
         avatar_color: true,
+        avatar_url: true,
         created_at: true
       }
     });
@@ -2399,6 +2427,27 @@ app.post('/api/verify-payment', authenticateToken as any, async (req: AuthReques
     return res.json({ success: true, message: 'Payment verified and profile upgraded to Pro' });
   } catch (error) {
     console.error('Verify Payment Internal Error:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+app.post('/api/payment/upgrade-free', authenticateToken as any, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user.userId;
+    await prisma.user.update({
+      where: { id: userId },
+      data: { is_pro: 1, updated_at: BigInt(Date.now()) }
+    });
+
+    try {
+      await sendPushNotification(userId, 'Splitmaro Pro Activated! 💎', 'Thank you for upgrading. Enjoy premium features!');
+    } catch (pushErr) {
+      console.error('Failed to send push notification:', pushErr);
+    }
+
+    return res.json({ success: true, message: 'Profile upgraded to Pro successfully' });
+  } catch (error) {
+    console.error('Upgrade Free Error:', error);
     res.status(500).json({ error: String(error) });
   }
 });

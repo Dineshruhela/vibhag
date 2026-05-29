@@ -13,6 +13,7 @@ import React, { useEffect, useState } from 'react';
 import { Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { createExpense, getCurrentUser, getGroupMembers, uploadReceiptImage, type User } from '../../lib/database';
+import { formatCurrency } from '../../lib/format';
 
 const categories = Object.entries(CategoryColors);
 
@@ -289,7 +290,7 @@ export default function AddExpenseScreen() {
           {amount && parseFloat(amount) > 0 && (
             <View style={[styles.preview, { backgroundColor: colors.primaryLight }]}>
               <Text style={[styles.previewText, { color: colors.primary }]}>
-                {formatShare(parseFloat(amount), members.length - excluded.size)} per person
+                {formatShare(parseFloat(amount), members.length - excluded.size, currency)} per person
               </Text>
             </View>
           )}
@@ -298,7 +299,7 @@ export default function AddExpenseScreen() {
           <View style={styles.recurringSection}>
             <View style={styles.sectionHeader}>
               <Text style={[styles.label, { color: colors.textSecondary, marginTop: 0 }]}>RECURRING</Text>
-              {currentUser && !currentUser.is_pro && (
+              {Platform.OS !== 'ios' && currentUser && !currentUser.is_pro && (
                 <View style={[styles.proBadge, { backgroundColor: colors.primary }]}>
                   <Text style={styles.proBadgeText}>PRO</Text>
                 </View>
@@ -309,7 +310,7 @@ export default function AddExpenseScreen() {
               {(['none', 'weekly', 'monthly', 'yearly'] as const).map((type) => (
                 <Pressable
                   key={type}
-                  disabled={currentUser && !currentUser.is_pro && type !== 'none'}
+                  disabled={Platform.OS !== 'ios' && currentUser && !currentUser.is_pro && type !== 'none'}
                   onPress={() => {
                     setRecurringType(type);
                     Haptics.selectionAsync();
@@ -319,7 +320,7 @@ export default function AddExpenseScreen() {
                     {
                       backgroundColor: recurringType === type ? colors.primary + '20' : colors.surface,
                       borderColor: recurringType === type ? colors.primary : colors.border,
-                      opacity: (currentUser && !currentUser.is_pro && type !== 'none') ? 0.5 : 1
+                      opacity: (Platform.OS !== 'ios' && currentUser && !currentUser.is_pro && type !== 'none') ? 0.5 : 1
                     }
                   ]}
                 >
@@ -333,7 +334,7 @@ export default function AddExpenseScreen() {
               ))}
             </View>
             
-            {currentUser && !currentUser.is_pro && recurringType === 'none' && (
+            {Platform.OS !== 'ios' && currentUser && !currentUser.is_pro && recurringType === 'none' && (
               <Pressable onPress={() => router.push('/pro/upgrade')} style={styles.proHint}>
                 <Ionicons name="diamond-outline" size={14} color={colors.primary} />
                 <Text style={[styles.proHintText, { color: colors.primary }]}>Upgrade to Pro for recurring expenses</Text>
@@ -346,10 +347,10 @@ export default function AddExpenseScreen() {
   );
 }
 
-function formatShare(total: number, count: number): string {
-  if (count <= 0) return '₹0.00';
+function formatShare(total: number, count: number, currency: string): string {
+  if (count <= 0) return formatCurrency(0, currency);
   const share = Math.round((total / count) * 100) / 100;
-  return `₹${share.toFixed(2)}`;
+  return formatCurrency(share, currency);
 }
 
 const styles = StyleSheet.create({

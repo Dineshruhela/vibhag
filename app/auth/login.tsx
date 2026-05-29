@@ -30,12 +30,18 @@ try {
   GoogleSignin = GoogleModule.GoogleSignin;
   statusCodes = GoogleModule.statusCodes;
   if (GoogleSignin) {
-    GoogleSignin.configure({
+    const config: any = {
       webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
-      iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
-      androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
       offlineAccess: false,
-    });
+    };
+    if (Platform.OS === 'ios') {
+      config.iosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
+    } else if (Platform.OS === 'android') {
+      if (process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID) {
+        config.androidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
+      }
+    }
+    GoogleSignin.configure(config);
   }
 } catch (e) {
   console.warn('Google Sign-In native module not found (ignored on Expo Go).');
@@ -432,11 +438,7 @@ export default function LoginScreen() {
 
             {/* General Footer */}
             <View style={styles.footer}>
-              {isLogin && showEmailForm && (
-                <Pressable style={styles.forgotBtn}>
-                  <Text style={[styles.forgotText, { color: colors.primary }]}>Forgot Password?</Text>
-                </Pressable>
-              )}
+              {/* Forgot Password: hidden until proper email-based reset flow is built */}
 
               <Pressable onPress={handleForceLogout} style={{ marginTop: 24 }} hitSlop={12}>
                 <Text style={{ color: colors.textTertiary, fontSize: 13, textDecorationLine: 'underline' }}>
