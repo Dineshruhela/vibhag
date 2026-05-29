@@ -94,7 +94,10 @@ export default function UpgradeScreen() {
         console.log('[UpgradeScreen] Initiating RevenueCat Apple IAP purchase for:', rcPackage.identifier);
         const { customerInfo } = await Purchases.purchasePackage(rcPackage);
 
-        const isEntitled = typeof customerInfo.entitlements.active['pro'] !== 'undefined' || customerInfo.entitlements.all['pro']?.isActive;
+        const isEntitled = 
+          typeof customerInfo.entitlements.active['pro'] !== 'undefined' || 
+          typeof customerInfo.entitlements.active['splitmaro Pro'] !== 'undefined' || 
+          Object.keys(customerInfo.entitlements.active).length > 0;
 
         if (isEntitled || customerInfo.activeSubscriptions.length > 0) {
           console.log('[UpgradeScreen] Purchase verified by RevenueCat! Syncing with backend...');
