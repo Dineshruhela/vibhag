@@ -269,9 +269,13 @@ export async function deleteFriend(id: string): Promise<void> {
   });
 }
 
-export async function syncRevenueCatProStatus(): Promise<User> {
+export async function syncRevenueCatProStatus(params?: { amount?: number; currency?: string }): Promise<User> {
   const response = await apiRequest('/api/payment/revenuecat-sync', {
-    method: 'POST'
+    method: 'POST',
+    body: JSON.stringify({
+      amount: params?.amount,
+      currency: params?.currency,
+    }),
   });
   if (response && response.success && response.user) {
     const mapped: User = {
@@ -293,6 +297,7 @@ export async function syncRevenueCatProStatus(): Promise<User> {
   }
   throw new Error('Failed to synchronize Pro status with backend');
 }
+
 
 export async function getFriendRequests(): Promise<User[]> {
   try {

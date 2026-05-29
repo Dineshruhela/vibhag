@@ -2603,6 +2603,10 @@ app.post('/api/payment/upgrade-free', authenticateToken as any, async (req: Auth
 app.post('/api/payment/revenuecat-sync', authenticateToken as any, async (req: AuthRequest, res) => {
   try {
     const userId = req.user.userId;
+    // Accept the real App Store price forwarded from the client
+    const { amount: bodyAmount, currency: bodyCurrency } = req.body || {};
+    const purchaseAmount = typeof bodyAmount === 'number' && bodyAmount > 0 ? bodyAmount : 499.00;
+    const purchaseCurrency = typeof bodyCurrency === 'string' && bodyCurrency.length > 0 ? bodyCurrency.toUpperCase() : 'INR';
     
     const user = await prisma.user.update({
       where: { id: userId },
@@ -2622,8 +2626,8 @@ app.post('/api/payment/revenuecat-sync', authenticateToken as any, async (req: A
           data: {
             id: uuidv4(),
             user_id: userId,
-            amount: 499.00,
-            currency: 'INR',
+            amount: purchaseAmount,
+            currency: purchaseCurrency,
             status: 'completed',
             provider: 'revenuecat_apple_iap',
             razorpay_payment_id: 'rc_apple_' + Math.random().toString(36).substring(2, 10),
@@ -2653,6 +2657,7 @@ app.post('/api/payment/revenuecat-sync', authenticateToken as any, async (req: A
     res.status(500).json({ error: String(error) });
   }
 });
+
 
 app.get('/api/payment/history', authenticateToken as any, async (req: AuthRequest, res) => {
   try {

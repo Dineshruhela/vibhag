@@ -102,7 +102,11 @@ export default function UpgradeScreen() {
         if (isEntitled || customerInfo.activeSubscriptions.length > 0) {
           console.log('[UpgradeScreen] Purchase verified by RevenueCat! Syncing with backend...');
           const { syncRevenueCatProStatus } = require('../../lib/database');
-          await syncRevenueCatProStatus();
+          // Pass real App Store price so backend records the actual transaction amount
+          await syncRevenueCatProStatus({
+            amount: rcPackage.product.price,
+            currency: rcPackage.product.currencyCode || 'INR',
+          });
           
           DeviceEventEmitter.emit('auth_change');
           Alert.alert('Splitmaro Pro Activated! 💎', 'Enjoy unlimited groups, recurring expenses, budget alerts, and all other premium features.', [
@@ -211,7 +215,7 @@ export default function UpgradeScreen() {
               <Text style={styles.btnText}>Processing...</Text>
             ) : (
               <Text style={styles.btnText}>
-                {Platform.OS === 'ios' ? 'Unlock Premium Features' : `Upgrade Now for ${currencySymbol}${price}`}
+                {`Upgrade Now — ${currencySymbol}${price}`}
               </Text>
             )}
           </Pressable>
