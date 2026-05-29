@@ -269,6 +269,42 @@ export async function deleteFriend(id: string): Promise<void> {
   });
 }
 
+export async function getFriendRequests(): Promise<User[]> {
+  try {
+    const requests = await apiRequest('/api/users/friends/requests');
+    if (!requests) return [];
+    return requests.map((u: any) => ({
+      id: u.id,
+      name: u.name,
+      email: u.email ?? null,
+      phone: u.phone ?? null,
+      avatar_color: u.avatar_color,
+      avatar_url: u.avatar_url ?? null,
+      upi_id: u.upi_id ?? null,
+      is_pro: u.is_pro ? 1 : 0,
+      is_admin: u.is_admin ? 1 : 0,
+      budget_amount: u.budget_amount ? Number(u.budget_amount) : null,
+      is_current_user: 0,
+      created_at: Number(u.created_at),
+    }));
+  } catch (e) {
+    console.error('[getFriendRequests] Error:', e);
+    return [];
+  }
+}
+
+export async function acceptFriendRequest(id: string): Promise<void> {
+  await apiRequest(`/api/users/friends/${id}/accept`, {
+    method: 'POST',
+  });
+}
+
+export async function declineFriendRequest(id: string): Promise<void> {
+  await apiRequest(`/api/users/friends/${id}/decline`, {
+    method: 'POST',
+  });
+}
+
 // ======== GROUP OPERATIONS ========
 
 export type Group = {

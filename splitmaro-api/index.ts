@@ -1188,7 +1188,8 @@ app.get('/api/users/friends', authenticateToken as any, async (req: AuthRequest,
   try {
     const friendships = await prisma.friendship.findMany({
       where: {
-        user_id: req.user.userId
+        user_id: req.user.userId,
+        status: 'accepted'
       },
       include: {
         friend: true
@@ -1197,6 +1198,25 @@ app.get('/api/users/friends', authenticateToken as any, async (req: AuthRequest,
     const friends = friendships.map(f => f.friend).filter(Boolean);
     friends.sort((a, b) => a.name.localeCompare(b.name));
     res.json(friends);
+  } catch (error) {
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+app.get('/api/users/friends/requests', authenticateToken as any, async (req: AuthRequest, res) => {
+  try {
+    const friendships = await prisma.friendship.findMany({
+      where: {
+        friend_id: req.user.userId,
+        status: 'pending'
+      },
+      include: {
+        user: true
+      }
+    });
+    const senders = friendships.map(f => f.user).filter(Boolean);
+    senders.sort((a, b) => a.name.localeCompare(b.name));
+    res.json(senders);
   } catch (error) {
     res.status(500).json({ error: String(error) });
   }
@@ -1226,6 +1246,13 @@ app.post('/api/users/friends', authenticateToken as any, async (req: AuthRequest
       });
     }
 
+    let isRealUser = false;
+    if (friendUser) {
+      if (friendUser.password_hash !== null || friendUser.avatar_url !== null) {
+        isRealUser = true;
+      }
+    }
+
     if (!friendUser) {
       friendUser = await prisma.user.create({
         data: {
@@ -1250,17 +1277,101 @@ app.post('/api/users/friends', authenticateToken as any, async (req: AuthRequest
         }
       });
 
+      const status = isRealUser ? 'pending' : 'accepted';
+
       if (!existingFriendship) {
         await prisma.friendship.create({
           data: {
             user_id: req.user.userId,
-            friend_id: friendUser.id
+            friend_id: friendUser.id,
+            status: status
           }
+        });
+      } else if (existingFriendship.status !== 'accepted' && !isRealUser) {
+        await prisma.friendship.update({
+          where: {
+            user_id_friend_id: {
+              user_id: req.user.userId,
+              friend_id: friendUser.id
+            }
+          },
+          data: { status: 'accepted' }
         });
       }
     }
 
-    res.json(friendUser);
+    res.json({
+      ...friendUser,
+      friendship_status: isRealUser ? 'pending' : 'accepted'
+    });
+  } catch (error) {
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+app.post('/api/users/friends/:id/accept', authenticateToken as any, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params as { id: string };
+
+    await prisma.friendship.updateMany({
+      where: {
+        user_id: id,
+        friend_id: req.user.userId
+      },
+      data: {
+        status: 'accepted'
+      }
+    });
+
+    const existingReciprocal = await prisma.friendship.findUnique({
+      where: {
+        user_id_friend_id: {
+          user_id: req.user.userId,
+          friend_id: id
+        }
+      }
+    });
+
+    if (!existingReciprocal) {
+      await prisma.friendship.create({
+        data: {
+          user_id: req.user.userId,
+          friend_id: id,
+          status: 'accepted'
+        }
+      });
+    } else {
+      await prisma.friendship.update({
+        where: {
+          user_id_friend_id: {
+            user_id: req.user.userId,
+            friend_id: id
+          }
+        },
+        data: {
+          status: 'accepted'
+        }
+      });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+app.post('/api/users/friends/:id/decline', authenticateToken as any, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params as { id: string };
+
+    await prisma.friendship.deleteMany({
+      where: {
+        user_id: id,
+        friend_id: req.user.userId
+      }
+    });
+
+    res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: String(error) });
   }
@@ -1273,8 +1384,10 @@ app.delete('/api/users/friends/:id', authenticateToken as any, async (req: AuthR
     
     await prisma.friendship.deleteMany({
       where: {
-        user_id: req.user.userId,
-        friend_id: id
+        OR: [
+          { user_id: req.user.userId, friend_id: id },
+          { user_id: id, friend_id: req.user.userId }
+        ]
       }
     });
     res.json({ success: true });

@@ -153,6 +153,7 @@ model SystemSetting {
 model Friendship {
   user_id   String
   friend_id String
+  status    String @default("accepted") // "pending" or "accepted"
   user      User   @relation("user_friends", fields: [user_id], references: [id], onDelete: Cascade)
   friend    User   @relation("friend_users", fields: [friend_id], references: [id], onDelete: Cascade)
 
