@@ -2600,6 +2600,60 @@ app.post('/api/payment/upgrade-free', authenticateToken as any, async (req: Auth
   }
 });
 
+app.post('/api/payment/revenuecat-sync', authenticateToken as any, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user.userId;
+    
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: { is_pro: 1, updated_at: BigInt(Date.now()) }
+    });
+
+    try {
+      const existingPurchase = await prisma.purchase.findFirst({
+        where: {
+          user_id: userId,
+          provider: 'revenuecat_apple_iap'
+        }
+      });
+
+      if (!existingPurchase) {
+        await prisma.purchase.create({
+          data: {
+            id: uuidv4(),
+            user_id: userId,
+            amount: 499.00,
+            currency: 'INR',
+            status: 'completed',
+            provider: 'revenuecat_apple_iap',
+            razorpay_payment_id: 'rc_apple_' + Math.random().toString(36).substring(2, 10),
+            created_at: BigInt(Date.now())
+          }
+        });
+      }
+    } catch (dbErr) {
+      console.error('Failed to create purchase record:', dbErr);
+    }
+
+    try {
+      await sendPushNotification(userId, 'Splitmaro Pro Activated! 💎', 'Thank you for upgrading. Enjoy premium features!');
+    } catch (pushErr) {
+      console.error('Failed to send push notification:', pushErr);
+    }
+
+    const cleanUser = {
+      ...user,
+      created_at: Number(user.created_at),
+      updated_at: user.updated_at ? Number(user.updated_at) : null
+    };
+
+    return res.json({ success: true, user: cleanUser });
+  } catch (error) {
+    console.error('RevenueCat Sync Error:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
 app.get('/api/payment/history', authenticateToken as any, async (req: AuthRequest, res) => {
   try {
     const userId = req.user.userId;

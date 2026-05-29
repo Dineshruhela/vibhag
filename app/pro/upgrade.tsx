@@ -19,71 +19,94 @@ export default function UpgradeScreen() {
   const [price, setPrice] = useState(499);
   const [currencySymbol, setCurrencySymbol] = useState('₹');
   const [loading, setLoading] = useState(false);
+  const [rcPackage, setRcPackage] = useState<any>(null);
 
-  // iOS: All features are free — redirect back if user somehow reaches this screen
   React.useEffect(() => {
     if (Platform.OS === 'ios') {
-      router.back();
-    }
-  }, [router]);
-
-  React.useEffect(() => {
-    (async () => {
-      try {
-        const config = await apiRequest('/api/payment/config');
-        if (config && config.amount) {
-          setPrice(config.amount);
-          const symbols: Record<string, string> = { INR: '₹', USD: '$', EUR: '€', GBP: '£' };
-          setCurrencySymbol(symbols[config.currency] || config.currency || '₹');
+      (async () => {
+        try {
+          const Purchases = require('react-native-purchases').default;
+          const offerings = await Purchases.getOfferings();
+          if (offerings.current !== null && offerings.current.availablePackages.length !== 0) {
+            const proPackage = offerings.current.availablePackages[0];
+            setRcPackage(proPackage);
+            setPrice(proPackage.product.price);
+            setCurrencySymbol(proPackage.product.currencySymbol || '₹');
+          }
+        } catch (e) {
+          console.warn('[UpgradeScreen] Failed to fetch offerings:', e);
         }
-      } catch (err) {
-        console.warn('[UpgradeScreen] Failed to fetch payment config:', err);
-      }
-    })();
+      })();
+    } else {
+      (async () => {
+        try {
+          const config = await apiRequest('/api/payment/config');
+          if (config && config.amount) {
+            setPrice(config.amount);
+            const symbols: Record<string, string> = { INR: '₹', USD: '$', EUR: '€', GBP: '£' };
+            setCurrencySymbol(symbols[config.currency] || config.currency || '₹');
+          }
+        } catch (err) {
+          console.warn('[UpgradeScreen] Failed to fetch payment config:', err);
+        }
+      })();
+    }
   }, []);
 
   React.useEffect(() => {
-    // Listen for custom deep link event broadcast from root layout
-    const sub = DeviceEventEmitter.addListener('pro_upgrade_success', async () => {
-      console.log('[UpgradeScreen] Received success event from deep link redirect!');
-      setLoading(true);
-      try {
-        Alert.alert('Verifying purchase...', 'Activating Splitmaro Pro 💎');
-        // Force refresh current user profile from backend
-        const updatedUser = await refreshCurrentUser();
-        console.log('[UpgradeScreen] Refreshed user:', updatedUser);
-        
-        if (updatedUser.is_pro) {
-          Alert.alert('Welcome to Pro! 💎', 'Your account has been successfully upgraded to Splitmaro Pro.', [
-            { text: 'Awesome!', onPress: () => router.back() }
-          ]);
-        } else {
-          Alert.alert('Activation Pending', 'We are still processing your payment. Please wait a moment.');
+    if (Platform.OS !== 'ios') {
+      const sub = DeviceEventEmitter.addListener('pro_upgrade_success', async () => {
+        console.log('[UpgradeScreen] Received success event from deep link redirect!');
+        setLoading(true);
+        try {
+          Alert.alert('Verifying purchase...', 'Activating Splitmaro Pro 💎');
+          const updatedUser = await refreshCurrentUser();
+          console.log('[UpgradeScreen] Refreshed user:', updatedUser);
+          
+          if (updatedUser.is_pro) {
+            Alert.alert('Welcome to Pro! 💎', 'Your account has been successfully upgraded to Splitmaro Pro.', [
+              { text: 'Awesome!', onPress: () => router.back() }
+            ]);
+          } else {
+            Alert.alert('Activation Pending', 'We are still processing your payment. Please wait a moment.');
+          }
+        } catch (e: any) {
+          console.error('[UpgradeScreen] Failed to verify payment:', e);
+          Alert.alert('Verification Error', 'Failed to refresh Pro upgrade status. Please try restarting the app.');
+        } finally {
+          setLoading(false);
         }
-      } catch (e: any) {
-        console.error('[UpgradeScreen] Failed to verify payment:', e);
-        Alert.alert('Verification Error', 'Failed to refresh Pro upgrade status. Please try restarting the app.');
-      } finally {
-        setLoading(false);
-      }
-    });
+      });
 
-    return () => sub.remove();
+      return () => sub.remove();
+    }
   }, [router]);
 
   const handleUpgrade = async () => {
     setLoading(true);
     try {
       if (Platform.OS === 'ios') {
-        const res = await apiRequest('/api/payment/upgrade-free', { method: 'POST' });
-        if (res && res.success) {
-          await refreshCurrentUser();
+        const Purchases = require('react-native-purchases').default;
+        if (!rcPackage) {
+          throw new Error('Store offerings are not loaded yet. Please try again in a moment.');
+        }
+
+        console.log('[UpgradeScreen] Initiating RevenueCat Apple IAP purchase for:', rcPackage.identifier);
+        const { customerInfo } = await Purchases.purchasePackage(rcPackage);
+
+        const isEntitled = typeof customerInfo.entitlements.active['pro'] !== 'undefined' || customerInfo.entitlements.all['pro']?.isActive;
+
+        if (isEntitled || customerInfo.activeSubscriptions.length > 0) {
+          console.log('[UpgradeScreen] Purchase verified by RevenueCat! Syncing with backend...');
+          const { syncRevenueCatProStatus } = require('../../lib/database');
+          await syncRevenueCatProStatus();
+          
           DeviceEventEmitter.emit('auth_change');
           Alert.alert('Splitmaro Pro Activated! 💎', 'Enjoy unlimited groups, recurring expenses, budget alerts, and all other premium features.', [
             { text: 'Awesome!', onPress: () => router.back() }
           ]);
         } else {
-          throw new Error(res.error || 'Failed to activate Pro status');
+          throw new Error('Your payment was successful, but the Pro entitlement could not be verified. Please restore your purchase.');
         }
         return;
       }
@@ -103,7 +126,6 @@ export default function UpgradeScreen() {
       console.log('[UpgradeScreen] Opening checkout URL:', checkoutUrl);
       const result = await WebBrowser.openBrowserAsync(checkoutUrl);
       
-      // If the user closed the browser manually, let's refresh status just in case they actually paid
       if (result.type === 'cancel') {
         console.log('[UpgradeScreen] WebBrowser closed manually by user, checking status...');
         try {
@@ -120,7 +142,9 @@ export default function UpgradeScreen() {
       }
     } catch (e: any) {
       console.error('[UpgradeScreen] Upgrade failed:', e);
-      Alert.alert('Payment Error', e.message || 'Failed to initiate payment. Please try again.');
+      if (!e.userCancelled) {
+        Alert.alert('Payment Error', e.message || 'Failed to initiate payment. Please try again.');
+      }
     } finally {
       setLoading(false);
     }

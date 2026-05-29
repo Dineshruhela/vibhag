@@ -269,6 +269,31 @@ export async function deleteFriend(id: string): Promise<void> {
   });
 }
 
+export async function syncRevenueCatProStatus(): Promise<User> {
+  const response = await apiRequest('/api/payment/revenuecat-sync', {
+    method: 'POST'
+  });
+  if (response && response.success && response.user) {
+    const mapped: User = {
+      id: response.user.id,
+      name: response.user.name,
+      email: response.user.email ?? null,
+      phone: response.user.phone ?? null,
+      avatar_color: response.user.avatar_color,
+      avatar_url: response.user.avatar_url ?? null,
+      upi_id: response.user.upi_id ?? null,
+      is_pro: response.user.is_pro ? 1 : 0,
+      is_admin: response.user.is_admin ? 1 : 0,
+      budget_amount: response.user.budget_amount ? Number(response.user.budget_amount) : null,
+      is_current_user: 1,
+      created_at: Number(response.user.created_at),
+    };
+    await AsyncStorage.setItem('current_user_profile', JSON.stringify(mapped));
+    return mapped;
+  }
+  throw new Error('Failed to synchronize Pro status with backend');
+}
+
 export async function getFriendRequests(): Promise<User[]> {
   try {
     const requests = await apiRequest('/api/users/friends/requests');

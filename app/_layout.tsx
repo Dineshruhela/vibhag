@@ -55,6 +55,50 @@ export default function RootLayout() {
   useNotifications();
   useSync();
 
+  // Configure RevenueCat Purchases once the user profile is loaded
+  useEffect(() => {
+    if (Platform.OS === 'ios') {
+      (async () => {
+        try {
+          const { getCurrentUser } = require('../lib/database');
+          const Purchases = require('react-native-purchases').default;
+          const user = await getCurrentUser().catch(() => null);
+          if (user && user.id) {
+            console.log('[Purchases] Initializing RevenueCat for user:', user.id);
+            Purchases.configure({
+              apiKey: process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY || 'your_revenuecat_api_key',
+              appUserID: user.id
+            });
+          }
+        } catch (e) {
+          console.warn('[Purchases] Failed to initialize RevenueCat:', e);
+        }
+      })();
+    }
+  }, []);
+
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('auth_change', async () => {
+      if (Platform.OS === 'ios') {
+        try {
+          const { getCurrentUser } = require('../lib/database');
+          const Purchases = require('react-native-purchases').default;
+          const user = await getCurrentUser().catch(() => null);
+          if (user && user.id) {
+            console.log('[Purchases] Re-configuring RevenueCat for user:', user.id);
+            Purchases.configure({
+              apiKey: process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY || 'your_revenuecat_api_key',
+              appUserID: user.id
+            });
+          }
+        } catch (e) {
+          console.warn('[Purchases] Failed to re-configure RevenueCat:', e);
+        }
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
   // Handle deep links (e.g. splitmaro://join/GROUP_ID)
   useEffect(() => {
     const handleUrl = (event: { url: string }) => {
