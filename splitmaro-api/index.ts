@@ -1186,12 +1186,16 @@ app.get('/api/referrals/stats', authenticateToken as any, async (req: AuthReques
 
 app.get('/api/users/friends', authenticateToken as any, async (req: AuthRequest, res) => {
   try {
-    const friends = await prisma.user.findMany({
+    const friendships = await prisma.friendship.findMany({
       where: {
-        id: { not: req.user.userId }
+        user_id: req.user.userId
       },
-      orderBy: { name: 'asc' }
+      include: {
+        friend: true
+      }
     });
+    const friends = friendships.map(f => f.friend).filter(Boolean);
+    friends.sort((a, b) => a.name.localeCompare(b.name));
     res.json(friends);
   } catch (error) {
     res.status(500).json({ error: String(error) });
@@ -1208,27 +1212,55 @@ app.post('/api/users/friends', authenticateToken as any, async (req: AuthRequest
     const trimmedPhone = (typeof phone === 'string') ? phone.trim() : null;
     const now = Date.now();
 
+    let friendUser = null;
+
     if (trimmedEmail) {
-      const existing = await prisma.user.findFirst({
+      friendUser = await prisma.user.findFirst({
         where: { email: trimmedEmail }
       });
-      if (existing) {
-        return res.json(existing);
+    }
+
+    if (!friendUser && trimmedPhone) {
+      friendUser = await prisma.user.findFirst({
+        where: { phone: trimmedPhone }
+      });
+    }
+
+    if (!friendUser) {
+      friendUser = await prisma.user.create({
+        data: {
+          id: uuidv4(),
+          name: trimmedName,
+          email: trimmedEmail,
+          phone: trimmedPhone,
+          avatar_color: avatar_color || '#'+Math.floor(Math.random()*16777215).toString(16),
+          created_at: BigInt(now),
+          updated_at: BigInt(now)
+        }
+      });
+    }
+
+    if (friendUser.id !== req.user.userId) {
+      const existingFriendship = await prisma.friendship.findUnique({
+        where: {
+          user_id_friend_id: {
+            user_id: req.user.userId,
+            friend_id: friendUser.id
+          }
+        }
+      });
+
+      if (!existingFriendship) {
+        await prisma.friendship.create({
+          data: {
+            user_id: req.user.userId,
+            friend_id: friendUser.id
+          }
+        });
       }
     }
 
-    const friend = await prisma.user.create({
-      data: {
-        id: uuidv4(),
-        name: trimmedName,
-        email: trimmedEmail,
-        phone: trimmedPhone,
-        avatar_color: avatar_color || '#'+Math.floor(Math.random()*16777215).toString(16),
-        created_at: BigInt(now),
-        updated_at: BigInt(now)
-      }
-    });
-    res.json(friend);
+    res.json(friendUser);
   } catch (error) {
     res.status(500).json({ error: String(error) });
   }
@@ -1239,8 +1271,11 @@ app.delete('/api/users/friends/:id', authenticateToken as any, async (req: AuthR
     const { id } = req.params as { id: string };
     if (id === req.user.userId) return res.status(400).json({ error: 'Cannot delete current user' });
     
-    await prisma.user.delete({
-      where: { id }
+    await prisma.friendship.deleteMany({
+      where: {
+        user_id: req.user.userId,
+        friend_id: id
+      }
     });
     res.json({ success: true });
   } catch (error) {
