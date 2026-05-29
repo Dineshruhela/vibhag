@@ -213,7 +213,6 @@ export default function ProfileScreen() {
           )}
         </Animated.View>
 
-        {Platform.OS !== 'ios' && (
         <Animated.View entering={FadeInDown.delay(250).springify()}>
           <Text style={[styles.label, { color: colors.textSecondary, marginTop: Spacing.xl }]}>SUBSCRIPTION</Text>
           <Card variant="default" padding={0} style={{ overflow: 'hidden' }}>
@@ -244,7 +243,6 @@ export default function ProfileScreen() {
             </View>
           </Card>
         </Animated.View>
-        )}
 
         {Platform.OS !== 'ios' && (
         <Animated.View entering={FadeInDown.delay(270).springify()}>

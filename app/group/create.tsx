@@ -39,7 +39,7 @@ export default function CreateGroupScreen() {
     try {
       const [count, user] = await Promise.all([getGroupsCount(), getCurrentUser()]);
       
-      if (Platform.OS !== 'ios' && count >= 3 && !user.is_pro) {
+      if (count >= 3 && !user.is_pro) {
         setSaving(false);
         Alert.alert(
           'Limit Reached',

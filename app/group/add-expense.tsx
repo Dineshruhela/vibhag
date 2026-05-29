@@ -299,7 +299,7 @@ export default function AddExpenseScreen() {
           <View style={styles.recurringSection}>
             <View style={styles.sectionHeader}>
               <Text style={[styles.label, { color: colors.textSecondary, marginTop: 0 }]}>RECURRING</Text>
-              {Platform.OS !== 'ios' && currentUser && !currentUser.is_pro && (
+              {currentUser && !currentUser.is_pro && (
                 <View style={[styles.proBadge, { backgroundColor: colors.primary }]}>
                   <Text style={styles.proBadgeText}>PRO</Text>
                 </View>
@@ -310,7 +310,7 @@ export default function AddExpenseScreen() {
               {(['none', 'weekly', 'monthly', 'yearly'] as const).map((type) => (
                 <Pressable
                   key={type}
-                  disabled={Platform.OS !== 'ios' && currentUser && !currentUser.is_pro && type !== 'none'}
+                  disabled={currentUser && !currentUser.is_pro && type !== 'none'}
                   onPress={() => {
                     setRecurringType(type);
                     Haptics.selectionAsync();
@@ -320,7 +320,7 @@ export default function AddExpenseScreen() {
                     {
                       backgroundColor: recurringType === type ? colors.primary + '20' : colors.surface,
                       borderColor: recurringType === type ? colors.primary : colors.border,
-                      opacity: (Platform.OS !== 'ios' && currentUser && !currentUser.is_pro && type !== 'none') ? 0.5 : 1
+                      opacity: (currentUser && !currentUser.is_pro && type !== 'none') ? 0.5 : 1
                     }
                   ]}
                 >
@@ -334,7 +334,7 @@ export default function AddExpenseScreen() {
               ))}
             </View>
             
-            {Platform.OS !== 'ios' && currentUser && !currentUser.is_pro && recurringType === 'none' && (
+            {currentUser && !currentUser.is_pro && recurringType === 'none' && (
               <Pressable onPress={() => router.push('/pro/upgrade')} style={styles.proHint}>
                 <Ionicons name="diamond-outline" size={14} color={colors.primary} />
                 <Text style={[styles.proHintText, { color: colors.primary }]}>Upgrade to Pro for recurring expenses</Text>
