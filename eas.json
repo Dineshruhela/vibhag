@@ -12,6 +12,7 @@
       }
     },
     "preview": {
+      "autoIncrement": true,
       "distribution": "internal",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.dineshruhela.com",
