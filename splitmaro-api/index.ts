@@ -388,6 +388,12 @@ app.post('/auth/social', async (req, res) => {
         dataToUpdate.is_admin = 1;
       }
 
+      // Reactivate deactivated accounts on login
+      if (existingUser.is_active === 0) {
+        dataToUpdate.is_active = 1;
+        console.log(`[Auth] Reactivating deactivated account for: ${normalizedEmail}`);
+      }
+
       let user = existingUser;
       if (Object.keys(dataToUpdate).length > 0) {
         dataToUpdate.updated_at = BigInt(Date.now());
@@ -527,8 +533,18 @@ const authenticateToken = (req: AuthRequest, res: any, next: any) => {
   const token = authHeader && authHeader.split(' ')[1];
   if (!token) return res.sendStatus(401);
 
-  jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
+  jwt.verify(token, JWT_SECRET, async (err: any, user: any) => {
     if (err) return res.sendStatus(403);
+    // Check if user account is deactivated
+    try {
+      const dbUser = await prisma.user.findUnique({ where: { id: user.userId }, select: { is_active: true } });
+      if (dbUser && dbUser.is_active === 0) {
+        return res.status(403).json({ error: 'Account deactivated. Please sign in again to reactivate.' });
+      }
+    } catch (e) {
+      // If DB check fails, allow request to proceed (fail-open for resilience)
+      console.warn('[Auth] Failed to check is_active status:', e);
+    }
     req.user = user;
     next();
   });
@@ -2355,6 +2371,232 @@ app.get('/api/users/me/total-spending-for-month', authenticateToken as any, asyn
   }
 });
 
+// --- ACCOUNT DEACTIVATION ---
+
+app.post('/api/users/me/deactivate', authenticateToken as any, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user.userId;
+
+    // Soft-delete: mark inactive, clear sensitive data, remove social links
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        is_active: 0,
+        push_token: null,
+        password_hash: null,
+        updated_at: BigInt(Date.now()),
+      }
+    });
+
+    // Remove all friendships (both directions)
+    await prisma.friendship.deleteMany({
+      where: { OR: [{ user_id: userId }, { friend_id: userId }] }
+    });
+
+    // Remove from all groups
+    await prisma.groupMember.deleteMany({
+      where: { user_id: userId }
+    });
+
+    console.log(`[Deactivate] Account deactivated for user: ${userId}`);
+    res.json({ success: true, message: 'Account deactivated successfully.' });
+  } catch (error) {
+    console.error('[Deactivate] Error:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// --- ADMIN ENDPOINTS ---
+
+// Helper: verify admin access
+async function requireAdmin(req: AuthRequest, res: any): Promise<boolean> {
+  const userId = req.user?.userId;
+  if (!userId) { res.status(401).json({ error: 'Unauthorized' }); return false; }
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { is_admin: true } });
+  if (!user || user.is_admin !== 1) { res.status(403).json({ error: 'Access denied: Admin privileges required' }); return false; }
+  return true;
+}
+
+// GET /api/admin/users — Paginated, searchable user list
+app.get('/api/admin/users', authenticateToken as any, async (req: AuthRequest, res) => {
+  try {
+    if (!await requireAdmin(req, res)) return;
+
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
+    const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
+    const filter = typeof req.query.filter === 'string' ? req.query.filter : '';
+
+    const where: any = {};
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+    if (filter === 'pro') where.is_pro = 1;
+    else if (filter === 'admin') where.is_admin = 1;
+    else if (filter === 'active') where.is_active = 1;
+    else if (filter === 'deactivated') where.is_active = 0;
+
+    const [users, totalCount] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        orderBy: { created_at: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        select: {
+          id: true, name: true, email: true, avatar_color: true, avatar_url: true,
+          is_pro: true, is_admin: true, is_active: true, upi_id: true,
+          created_at: true, updated_at: true,
+          _count: { select: { member_of: true, friends: true, purchases: true } }
+        }
+      }),
+      prisma.user.count({ where }),
+    ]);
+
+    res.json({
+      users: users.map(u => ({
+        ...u,
+        created_at: Number(u.created_at),
+        updated_at: u.updated_at ? Number(u.updated_at) : null,
+        group_count: u._count.member_of,
+        friend_count: u._count.friends,
+        purchase_count: u._count.purchases,
+      })),
+      totalCount,
+      page,
+      totalPages: Math.ceil(totalCount / limit),
+    });
+  } catch (error) {
+    console.error('[Admin Users] Error:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// PUT /api/admin/users/:id — Update user fields (is_pro, is_admin, name, etc.)
+app.put('/api/admin/users/:id', authenticateToken as any, async (req: AuthRequest, res) => {
+  try {
+    if (!await requireAdmin(req, res)) return;
+
+    const { id } = req.params as { id: string };
+    const { name, is_pro, is_admin, is_active } = req.body;
+
+    const dataToUpdate: any = { updated_at: BigInt(Date.now()) };
+    if (name !== undefined) dataToUpdate.name = String(name).trim();
+    if (is_pro !== undefined) dataToUpdate.is_pro = Number(is_pro);
+    if (is_admin !== undefined) dataToUpdate.is_admin = Number(is_admin);
+    if (is_active !== undefined) dataToUpdate.is_active = Number(is_active);
+
+    const user = await prisma.user.update({ where: { id }, data: dataToUpdate });
+    res.json({ success: true, user: { ...user, created_at: Number(user.created_at), updated_at: user.updated_at ? Number(user.updated_at) : null } });
+  } catch (error) {
+    console.error('[Admin Update User] Error:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// POST /api/admin/users/:id/deactivate — Admin-initiated deactivation
+app.post('/api/admin/users/:id/deactivate', authenticateToken as any, async (req: AuthRequest, res) => {
+  try {
+    if (!await requireAdmin(req, res)) return;
+
+    const { id } = req.params as { id: string };
+    await prisma.user.update({
+      where: { id },
+      data: { is_active: 0, push_token: null, updated_at: BigInt(Date.now()) }
+    });
+    await prisma.friendship.deleteMany({ where: { OR: [{ user_id: id }, { friend_id: id }] } });
+    await prisma.groupMember.deleteMany({ where: { user_id: id } });
+
+    res.json({ success: true, message: 'User deactivated.' });
+  } catch (error) {
+    console.error('[Admin Deactivate] Error:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// POST /api/admin/users/:id/reactivate — Reactivate a deactivated user
+app.post('/api/admin/users/:id/reactivate', authenticateToken as any, async (req: AuthRequest, res) => {
+  try {
+    if (!await requireAdmin(req, res)) return;
+
+    const { id } = req.params as { id: string };
+    await prisma.user.update({
+      where: { id },
+      data: { is_active: 1, updated_at: BigInt(Date.now()) }
+    });
+
+    res.json({ success: true, message: 'User reactivated.' });
+  } catch (error) {
+    console.error('[Admin Reactivate] Error:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// GET /api/admin/groups — List all groups with stats
+app.get('/api/admin/groups', authenticateToken as any, async (req: AuthRequest, res) => {
+  try {
+    if (!await requireAdmin(req, res)) return;
+
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
+    const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
+
+    const where: any = {};
+    if (search) {
+      where.name = { contains: search, mode: 'insensitive' };
+    }
+
+    const [groups, totalCount] = await Promise.all([
+      prisma.group.findMany({
+        where,
+        orderBy: { updated_at: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          _count: { select: { members: true, expenses: true, settlements: true } }
+        }
+      }),
+      prisma.group.count({ where }),
+    ]);
+
+    res.json({
+      groups: groups.map(g => ({
+        id: g.id,
+        name: g.name,
+        category: g.category,
+        created_by: g.created_by,
+        created_at: Number(g.created_at),
+        updated_at: Number(g.updated_at),
+        member_count: g._count.members,
+        expense_count: g._count.expenses,
+        settlement_count: g._count.settlements,
+      })),
+      totalCount,
+      page,
+      totalPages: Math.ceil(totalCount / limit),
+    });
+  } catch (error) {
+    console.error('[Admin Groups] Error:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// DELETE /api/admin/groups/:id — Admin delete group
+app.delete('/api/admin/groups/:id', authenticateToken as any, async (req: AuthRequest, res) => {
+  try {
+    if (!await requireAdmin(req, res)) return;
+
+    const { id } = req.params as { id: string };
+    await prisma.group.delete({ where: { id } });
+    res.json({ success: true, message: 'Group deleted.' });
+  } catch (error) {
+    console.error('[Admin Delete Group] Error:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
 // --- PAYMENT INTEGRATION ENDPOINTS ---
 app.get('/api/payment/config', async (req, res) => {
   const config = await getProUpgradeConfig();
@@ -2413,8 +2655,12 @@ app.get('/api/admin/stats', authenticateToken as any, async (req: AuthRequest, r
     }
 
     const totalUsers = await prisma.user.count();
+    const activeUsers = await prisma.user.count({ where: { is_active: 1 } });
+    const deactivatedUsers = await prisma.user.count({ where: { is_active: 0 } });
     const proUsers = await prisma.user.count({ where: { is_pro: 1 } });
     const totalReferrals = await prisma.user.count({ where: { NOT: { referred_by: null } } });
+    const totalGroups = await prisma.group.count();
+    const totalExpenses = await prisma.expense.count();
 
     const purchases = await prisma.purchase.findMany({
       orderBy: { created_at: 'desc' },
@@ -2435,8 +2681,12 @@ app.get('/api/admin/stats', authenticateToken as any, async (req: AuthRequest, r
 
     res.json({
       totalUsers,
+      activeUsers,
+      deactivatedUsers,
       proUsers,
       totalReferrals,
+      totalGroups,
+      totalExpenses,
       totalRevenue,
       purchases: purchases.map(p => ({
         ...p,

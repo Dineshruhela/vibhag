@@ -36,10 +36,6 @@ try {
     };
     if (Platform.OS === 'ios') {
       config.iosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
-    } else if (Platform.OS === 'android') {
-      if (process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID) {
-        config.androidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
-      }
     }
     GoogleSignin.configure(config);
   }

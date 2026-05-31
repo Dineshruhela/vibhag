@@ -24,7 +24,7 @@ import {
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { getAllGroups, getCurrentUser, getOverallBalance, type Group, type User } from '../../lib/database';
+import { getAllGroups, getCurrentUser, refreshCurrentUser, getOverallBalance, type Group, type User } from '../../lib/database';
 type Balance = { userId: string; userName: string; avatarColor: string; avatarUrl?: string | null; amount: number };
 
 export default function DashboardScreen() {
@@ -41,7 +41,7 @@ export default function DashboardScreen() {
   const loadData = useCallback(async () => {
     try {
       const [cu, overallData, groupsData] = await Promise.all([
-        getCurrentUser(),
+        refreshCurrentUser(),
         getOverallBalance(),
         getAllGroups(),
       ]);

@@ -21,6 +21,7 @@ model User {
   budget_amount   Float?
   password_hash   String?
   push_token      String?
+  is_active       Int      @default(1)
   created_at      BigInt
   updated_at      BigInt?
   referred_by     String?

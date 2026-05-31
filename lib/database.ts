@@ -58,8 +58,13 @@ export type User = {
 export async function getCurrentUser(): Promise<User> {
   const cached = await AsyncStorage.getItem('current_user_profile');
   if (cached) {
+    // Always trigger a non-blocking background refresh to keep cache fresh
+    refreshCurrentUser().catch((e) =>
+      console.warn('[getCurrentUser] Background refresh failed:', e)
+    );
     return JSON.parse(cached);
   }
+  // No cache — must fetch from server synchronously
   const user = await apiRequest('/api/users/me');
   if (user) {
     const mapped: User = {
@@ -147,6 +152,16 @@ export async function clearLocalDatabase(): Promise<void> {
 }
 
 export async function clearAllLocalData(): Promise<void> {
+  await AsyncStorage.clear();
+  await api.logout();
+}
+
+/**
+ * Deactivates the user's account on the backend (soft-delete),
+ * then clears all local data and logs out.
+ */
+export async function deactivateAccount(): Promise<void> {
+  await apiRequest('/api/users/me/deactivate', { method: 'POST' });
   await AsyncStorage.clear();
   await api.logout();
 }

@@ -16,7 +16,7 @@ import React, { useEffect, useState } from 'react';
 import { Alert, DeviceEventEmitter, Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { clearAllLocalData, clearLocalDatabase, getCurrentUser, refreshCurrentUser, updateUser, type User } from '../../lib/database';
+import { clearAllLocalData, clearLocalDatabase, getCurrentUser, refreshCurrentUser, updateUser, deactivateAccount, type User } from '../../lib/database';
 import { pullFromCloud } from '../../lib/sync';
 
 const UPI_REGEX = /^[a-zA-Z0-9._-]+@[a-zA-Z]{3,}$/;
@@ -134,20 +134,19 @@ export default function ProfileScreen() {
     ]);
   };
 
-  const handleDeleteAccount = () => {
-    Alert.alert('Delete Account', 'Are you sure? This will wipe all your local data and sign you out.', [
+  const handleDeactivateAccount = () => {
+    Alert.alert('Deactivate Account', 'Are you sure? This will remove your from all groups and log you out. Your past financial records will remain for other users.', [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Delete Permanently',
+        text: 'Deactivate Account',
         style: 'destructive',
         onPress: async () => {
           try {
-            await api.logout();
-            await clearAllLocalData();
+            await deactivateAccount();
             DeviceEventEmitter.emit('auth_change');
             router.replace('/auth/login');
           } catch (e) {
-            Alert.alert('Error', 'Failed to delete account');
+            Alert.alert('Error', 'Failed to deactivate account');
           }
         }
       }
@@ -436,8 +435,8 @@ export default function ProfileScreen() {
 
         <View style={{ height: 20 }} />
         
-        <Pressable onPress={handleDeleteAccount} style={styles.deleteBtn}>
-          <Text style={styles.deleteBtnText}>Delete Account</Text>
+        <Pressable onPress={handleDeactivateAccount} style={styles.deleteBtn}>
+          <Text style={styles.deleteBtnText}>Deactivate Account</Text>
         </Pressable>
 
         <View style={{ height: 40 }} />
