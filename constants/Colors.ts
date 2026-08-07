@@ -1,91 +1,141 @@
 /**
- * Splitmaro Design System Colors
- * Splitwise-inspired color palette with premium dark/light modes
+ * Splitmaro Design System Colors — v2
+ * Premium palette with gradient support, elevation surfaces, glass tokens
  */
 
-const tintColorLight = '#1CC29F';
-const tintColorDark = '#1CC29F';
+const tintColorLight = '#00C48C';
+const tintColorDark = '#00E5A8';
 
 export const Colors = {
   light: {
-    // Core
-    primary: '#1CC29F',
-    primaryLight: '#E8F8F4',
-    primaryDark: '#15967B',
-    
-    // Semantic
-    negative: '#FF6B6B',    // "You owe"
-    negativeLight: '#FFF0F0',
-    positive: '#5C6BC0',    // "You are owed"
-    positiveLight: '#ECEFFE',
-    
-    // Neutrals
-    text: '#1A1A2E',
-    textSecondary: '#6B7280',
-    textTertiary: '#9CA3AF',
-    
-    // Surfaces
-    background: '#F5F7FA',
-    surface: '#FFFFFF',
-    surfaceSecondary: '#F0F2F5',
-    
-    // UI
-    border: '#E5E7EB',
-    borderLight: '#F3F4F6',
-    icon: '#6B7280',
-    tabIconDefault: '#9CA3AF',
-    tabIconSelected: tintColorLight,
-    tint: tintColorLight,
-    
-    // Status
-    success: '#10B981',
-    warning: '#F59E0B',
-    error: '#EF4444',
-    info: '#3B82F6',
-    
-    // Shadows
-    shadow: 'rgba(0, 0, 0, 0.08)',
-    shadowMedium: 'rgba(0, 0, 0, 0.12)',
-  },
-  dark: {
-    // Core
-    primary: '#1CC29F',
-    primaryLight: '#1A2F2A',
-    primaryDark: '#25E8BF',
-    
+    // Core brand
+    primary: '#7C5CFC', // Deep Purple
+    primaryLight: '#322566',
+    primaryDark: '#5E46C2',
+    primaryGradientStart: '#7C5CFC',
+    primaryGradientEnd: '#9D82F5',
+
+    // Accent
+    accent: '#FF6B6B', // Coral CTA
+    accentLight: '#4A2A2A',
+    premium: '#F7D65A', // Gold for Pro
+    premiumLight: '#3A321A',
+
     // Semantic
     negative: '#FF6B6B',
     negativeLight: '#2D1F1F',
-    positive: '#7C8AE5',
-    positiveLight: '#1E2142',
-    
+    negativeGradient: '#FF5252',
+    positive: '#00D4B8', // Teal
+    positiveLight: '#123D3A',
+
     // Neutrals
-    text: '#F9FAFB',
-    textSecondary: '#9CA3AF',
-    textTertiary: '#6B7280',
-    
-    // Surfaces
-    background: '#0F1419',
-    surface: '#1A2332',
-    surfaceSecondary: '#243044',
-    
+    text: '#F1F5F9',
+    textSecondary: '#94A3B8',
+    textTertiary: '#64748B',
+    textInverse: '#12121D',
+
+    // Elevation surfaces
+    background: '#12121D',
+    surface: '#1E1E2D',
+    surface1: '#1E1E2D',
+    surface2: '#252538',
+    surface3: '#2A2A3E',
+    surfaceSecondary: '#242436',
+
+    // Glass / blur overlay tokens
+    glass: 'rgba(30, 30, 45, 0.72)',
+    glassBorder: 'rgba(255, 255, 255, 0.08)',
+    overlay: 'rgba(0, 0, 0, 0.6)',
+    scrim: 'rgba(0, 0, 0, 0.75)',
+
     // UI
-    border: '#2D3748',
-    borderLight: '#1F2937',
-    icon: '#9CA3AF',
-    tabIconDefault: '#6B7280',
-    tabIconSelected: tintColorDark,
-    tint: tintColorDark,
-    
+    border: 'rgba(255, 255, 255, 0.1)',
+    borderLight: 'rgba(255, 255, 255, 0.05)',
+    icon: '#94A3B8',
+    tabIconDefault: '#4B5563',
+    tabIconSelected: '#7C5CFC',
+    tint: '#7C5CFC',
+
     // Status
-    success: '#34D399',
+    success: '#00D4B8',
+    successLight: '#123D3A',
     warning: '#FBBF24',
-    error: '#F87171',
+    warningLight: '#3A2E10',
+    error: '#FF6B6B',
+    errorLight: '#2D1F1F',
     info: '#60A5FA',
-    
+    infoLight: '#172740',
+
     // Shadows
     shadow: 'rgba(0, 0, 0, 0.3)',
     shadowMedium: 'rgba(0, 0, 0, 0.5)',
+    shadowLarge: 'rgba(0, 0, 0, 0.7)',
+    shadowColor: '#000000',
+  },
+  dark: {
+    // Core brand
+    primary: '#7C5CFC', // Deep Purple
+    primaryLight: '#322566',
+    primaryDark: '#5E46C2',
+    primaryGradientStart: '#7C5CFC',
+    primaryGradientEnd: '#9D82F5',
+
+    // Accent
+    accent: '#FF6B6B', // Coral CTA
+    accentLight: '#4A2A2A',
+    premium: '#F7D65A', // Gold for Pro
+    premiumLight: '#3A321A',
+
+    // Semantic
+    negative: '#FF6B6B',
+    negativeLight: '#2D1F1F',
+    negativeGradient: '#FF5252',
+    positive: '#00D4B8', // Teal
+    positiveLight: '#123D3A',
+
+    // Neutrals
+    text: '#F1F5F9',
+    textSecondary: '#94A3B8',
+    textTertiary: '#64748B',
+    textInverse: '#12121D',
+
+    // Elevation surfaces
+    background: '#12121D',
+    surface: '#1E1E2D',
+    surface1: '#1E1E2D',
+    surface2: '#252538',
+    surface3: '#2A2A3E',
+    surfaceSecondary: '#242436',
+
+    // Glass / blur overlay tokens
+    glass: 'rgba(30, 30, 45, 0.72)',
+    glassBorder: 'rgba(255, 255, 255, 0.08)',
+    overlay: 'rgba(0, 0, 0, 0.6)',
+    scrim: 'rgba(0, 0, 0, 0.75)',
+
+    // UI
+    border: 'rgba(255, 255, 255, 0.1)',
+    borderLight: 'rgba(255, 255, 255, 0.05)',
+    icon: '#94A3B8',
+    tabIconDefault: '#4B5563',
+    tabIconSelected: '#7C5CFC',
+    tint: '#7C5CFC',
+
+    // Status
+    success: '#00D4B8',
+    successLight: '#123D3A',
+    warning: '#FBBF24',
+    warningLight: '#3A2E10',
+    error: '#FF6B6B',
+    errorLight: '#2D1F1F',
+    info: '#60A5FA',
+    infoLight: '#172740',
+
+    // Shadows
+    shadow: 'rgba(0, 0, 0, 0.3)',
+    shadowMedium: 'rgba(0, 0, 0, 0.5)',
+    shadowLarge: 'rgba(0, 0, 0, 0.7)',
+    shadowColor: '#000000',
   },
 };
 

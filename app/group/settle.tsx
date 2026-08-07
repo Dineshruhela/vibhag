@@ -95,12 +95,12 @@ export default function SettleScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.base, paddingVertical: Spacing.md, gap: 12 },
-  headerTitle: { flex: 1, fontSize: 18, fontWeight: '700', textAlign: 'center' },
+  headerTitle: { flex: 1, fontSize: 18, fontFamily: 'PlusJakartaSans_700Bold', textAlign: 'center' },
   content: { padding: Spacing.base, flex: 1 },
   amountBox: { flexDirection: 'row', alignItems: 'center', padding: Spacing.xl, borderRadius: BorderRadius.xl, marginBottom: Spacing.lg },
-  currency: { fontSize: 32, fontWeight: '800', marginRight: 8 },
-  amountInput: { flex: 1, fontSize: 36, fontWeight: '800', padding: 0 },
+  currency: { fontSize: 32, fontFamily: 'PlusJakartaSans_800ExtraBold', marginRight: 8 },
+  amountInput: { flex: 1, fontSize: 36, fontFamily: 'PlusJakartaSans_800ExtraBold', padding: 0 },
   noteInput: { padding: Spacing.base, borderRadius: BorderRadius.md, fontSize: 16, borderWidth: 1, marginBottom: Spacing.xl },
   settleBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: Spacing.base, borderRadius: BorderRadius.xl, gap: 8 },
-  settleBtnText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
+  settleBtnText: { color: '#FFF', fontSize: 16, fontFamily: 'PlusJakartaSans_700Bold' },
 });

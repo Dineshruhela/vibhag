@@ -20,8 +20,23 @@ export default function UpgradeScreen() {
   const [currencySymbol, setCurrencySymbol] = useState('₹');
   const [loading, setLoading] = useState(false);
   const [rcPackage, setRcPackage] = useState<any>(null);
+  const [isPro, setIsPro] = useState(false);
+
+  const refreshProStatus = async () => {
+    const updatedUser = await refreshCurrentUser();
+    const active = !!updatedUser.is_pro;
+    setIsPro(active);
+    if (active) DeviceEventEmitter.emit('auth_change');
+    return active;
+  };
+
+  const hasProEntitlement = (customerInfo: any) => {
+    const activeEntitlements = customerInfo?.entitlements?.active || {};
+    return Boolean(activeEntitlements.pro || activeEntitlements['splitmaro Pro']);
+  };
 
   React.useEffect(() => {
+    refreshProStatus().catch(() => setIsPro(false));
     if (Platform.OS === 'ios') {
       (async () => {
         try {
@@ -64,6 +79,8 @@ export default function UpgradeScreen() {
           console.log('[UpgradeScreen] Refreshed user:', updatedUser);
           
           if (updatedUser.is_pro) {
+            setIsPro(true);
+            DeviceEventEmitter.emit('auth_change');
             Alert.alert('Welcome to Pro! 💎', 'Your account has been successfully upgraded to Splitmaro Pro.', [
               { text: 'Awesome!', onPress: () => router.back() }
             ]);
@@ -94,12 +111,9 @@ export default function UpgradeScreen() {
         console.log('[UpgradeScreen] Initiating RevenueCat Apple IAP purchase for:', rcPackage.identifier);
         const { customerInfo } = await Purchases.purchasePackage(rcPackage);
 
-        const isEntitled = 
-          typeof customerInfo.entitlements.active['pro'] !== 'undefined' || 
-          typeof customerInfo.entitlements.active['splitmaro Pro'] !== 'undefined' || 
-          Object.keys(customerInfo.entitlements.active).length > 0;
+        const isEntitled = hasProEntitlement(customerInfo);
 
-        if (isEntitled || customerInfo.activeSubscriptions.length > 0) {
+        if (isEntitled) {
           console.log('[UpgradeScreen] Purchase verified by RevenueCat! Syncing with backend...');
           const { syncRevenueCatProStatus } = require('../../lib/database');
           // Pass real App Store price so backend records the actual transaction amount
@@ -107,6 +121,7 @@ export default function UpgradeScreen() {
             amount: rcPackage.product.price,
             currency: rcPackage.product.currencyCode || 'INR',
           });
+          setIsPro(true);
           
           DeviceEventEmitter.emit('auth_change');
           Alert.alert('Splitmaro Pro Activated! 💎', 'Enjoy unlimited groups, recurring expenses, budget alerts, and all other premium features.', [
@@ -136,8 +151,7 @@ export default function UpgradeScreen() {
       if (result.type === 'cancel') {
         console.log('[UpgradeScreen] WebBrowser closed manually by user, checking status...');
         try {
-          const user = await refreshCurrentUser();
-          if (user.is_pro) {
+          if (await refreshProStatus()) {
             Alert.alert('Welcome to Pro! 💎', 'Your account has been successfully upgraded to Splitmaro Pro.', [
               { text: 'Awesome!', onPress: () => router.back() }
             ]);
@@ -157,7 +171,34 @@ export default function UpgradeScreen() {
     }
   };
 
+  const handleRestore = async () => {
+    setLoading(true);
+    try {
+      if (Platform.OS === 'ios') {
+        const Purchases = require('react-native-purchases').default;
+        const customerInfo = await Purchases.restorePurchases();
+        if (!hasProEntitlement(customerInfo)) {
+          throw new Error('No active Splitmaro Pro purchase was found for this Apple ID.');
+        }
+        const { syncRevenueCatProStatus } = require('../../lib/database');
+        await syncRevenueCatProStatus();
+        setIsPro(true);
+        DeviceEventEmitter.emit('auth_change');
+        Alert.alert('Purchase Restored', 'Pro is active and ads have been removed.');
+      } else if (await refreshProStatus()) {
+        Alert.alert('Pro Active', 'Your verified payment is active and ads have been removed.');
+      } else {
+        Alert.alert('No Purchase Found', 'We could not find a verified Pro payment for this account yet.');
+      }
+    } catch (e: any) {
+      Alert.alert('Restore Failed', e.message || 'Could not restore your purchase.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const features = [
+    { icon: 'star', title: 'Ad-Free Experience', desc: 'Remove all ads and enjoy a seamless experience.' },
     { icon: 'people', title: 'Unlimited Groups', desc: 'Create as many groups as you need without limits.' },
     { icon: 'repeat', title: 'Recurring Expenses', desc: 'Auto-generate weekly, monthly, or yearly bills like rent and subscriptions.' },
     { icon: 'flash', title: 'Smart UPI Payments', desc: 'Settle debts instantly with integrated UPI deep linking.' },
@@ -183,6 +224,12 @@ export default function UpgradeScreen() {
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
             Level up your expense management with premium features.
           </Text>
+          {isPro && (
+            <View style={[styles.activeBadge, { backgroundColor: colors.primary + '18' }]}>
+              <Ionicons name="checkmark-circle" size={18} color={colors.primary} />
+              <Text style={[styles.activeBadgeText, { color: colors.primary }]}>Pro active · Ads removed</Text>
+            </View>
+          )}
         </Animated.View>
 
         <View style={styles.featuresList}>
@@ -207,7 +254,7 @@ export default function UpgradeScreen() {
 
         <Animated.View entering={FadeInDown.delay(800).springify()}>
           <Pressable 
-            onPress={handleUpgrade} 
+            onPress={isPro ? handleRestore : handleUpgrade}
             disabled={loading}
             style={[styles.upgradeBtn, { backgroundColor: colors.primary, opacity: loading ? 0.7 : 1 }]}
           >
@@ -215,9 +262,12 @@ export default function UpgradeScreen() {
               <Text style={styles.btnText}>Processing...</Text>
             ) : (
               <Text style={styles.btnText}>
-                {`Upgrade Now — ${currencySymbol}${price}`}
+                {isPro ? 'Check Pro Status' : `Upgrade Now — ${currencySymbol}${price}`}
               </Text>
             )}
+          </Pressable>
+          <Pressable onPress={handleRestore} disabled={loading} style={styles.restoreBtn}>
+            <Text style={[styles.restoreText, { color: colors.primary }]}>Restore / verify purchase</Text>
           </Pressable>
         </Animated.View>
       </ScrollView>
@@ -245,6 +295,8 @@ const styles = StyleSheet.create({
   diamondIcon: { width: 80, height: 80, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.lg, transform: [{ rotate: '45deg' }] },
   title: { fontSize: 32, fontWeight: '800', marginBottom: 12 },
   subtitle: { fontSize: 16, textAlign: 'center', lineHeight: 22, paddingHorizontal: 20 },
+  activeBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, marginTop: 16 },
+  activeBadgeText: { fontSize: 13, fontWeight: '700' },
   featuresList: { gap: 16 },
   featureCard: { flexDirection: 'row', padding: 16, borderRadius: BorderRadius.lg, borderWidth: 1, gap: 16, alignItems: 'center' },
   featureIcon: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
@@ -260,6 +312,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginHorizontal: Spacing.base,
   },
+  restoreBtn: { alignItems: 'center', paddingVertical: 14 },
+  restoreText: { fontSize: 14, fontWeight: '600' },
   btnText: {
     color: '#FFF',
     fontSize: 16,

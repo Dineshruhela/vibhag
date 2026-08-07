@@ -36,6 +36,47 @@ const prisma = new PrismaClient();
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
+// Cloud API Proxy Middleware (for local debugging using cloud API and DB data)
+if (process.env.PROXY_TO_CLOUD === 'true') {
+  const targetUrl = process.env.CLOUD_API_URL || 'https://api.dineshruhela.com';
+  console.log(`[Proxy Mode] Proxying all /auth and /api requests to cloud: ${targetUrl}`);
+
+  app.use(async (req, res, next) => {
+    if (req.path.startsWith('/auth') || req.path.startsWith('/api')) {
+      try {
+        const url = `${targetUrl}${req.originalUrl}`;
+        const headers = { ...req.headers };
+        // Delete host header to avoid SSL handshake/host mismatch issues with target
+        delete headers.host;
+
+        const response = await axios({
+          method: req.method as any,
+          url,
+          headers,
+          data: req.body,
+          params: req.query,
+          validateStatus: () => true, // Forward all status codes without throwing
+          responseType: 'arraybuffer'
+        });
+
+        // Copy response headers
+        Object.entries(response.headers).forEach(([key, value]) => {
+          if (value !== undefined) {
+            res.setHeader(key, value as string | string[]);
+          }
+        });
+
+        res.status(response.status).send(response.data);
+      } catch (err: any) {
+        console.error(`[Proxy Error] Failed to proxy ${req.method} ${req.path}:`, err.message);
+        res.status(500).json({ error: `Proxy failure: ${err.message}` });
+      }
+    } else {
+      next();
+    }
+  });
+}
+
 app.get('/', (req, res) => {
   const host = req.headers.host || '';
   if (host.includes('api.dineshruhela.com')) {
@@ -63,8 +104,42 @@ app.use(express.static(path.join(__dirname, 'public')));
   return Number(this);
 };
 
-const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key-change-me';
-const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'admin@splitmaro.com').toLowerCase().trim();
+// Never use a predictable signing secret. In development a process-local random
+// secret keeps the server usable without making tokens forgeable from source;
+// production must provide a persistent secret through the environment.
+const configuredJwtSecret = process.env.JWT_SECRET?.trim();
+if (process.env.NODE_ENV === 'production' && (!configuredJwtSecret || configuredJwtSecret.length < 32)) {
+  throw new Error('JWT_SECRET must be configured with at least 32 characters in production');
+}
+const JWT_SECRET = configuredJwtSecret || crypto.randomBytes(32).toString('hex');
+
+function publicUser(user: any) {
+  if (!user) return user;
+  const { password_hash, push_token, ...safeUser } = user;
+  return safeUser;
+}
+
+const authenticateToken = (req: AuthRequest, res: any, next: any) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
+  if (!token) return res.sendStatus(401);
+
+  jwt.verify(token, JWT_SECRET, async (err: any, user: any) => {
+    if (err || !user?.userId) return res.sendStatus(403);
+    try {
+      const dbUser = await prisma.user.findUnique({ where: { id: user.userId }, select: { is_active: true } });
+      if (!dbUser) return res.status(403).json({ error: 'User account not found' });
+      if (dbUser.is_active === 0) {
+        return res.status(403).json({ error: 'Account deactivated. Please sign in again to reactivate.' });
+      }
+    } catch (e) {
+      console.error('[Auth] Failed to check account status:', e);
+      return res.status(503).json({ error: 'Authentication service temporarily unavailable' });
+    }
+    req.user = user;
+    next();
+  });
+};
 
 async function getProUpgradeConfig() {
   try {
@@ -94,16 +169,33 @@ io.on('connection', (socket) => {
 /**
  * Sends a push notification via Expo
  */
+function isExpoPushToken(token: unknown): token is string {
+  return typeof token === 'string' && /^(Expo|Exponent)PushToken\[.+\]$/.test(token);
+}
+
 async function sendPushNotification(userId: string, title: string, body: string, data: any = {}) {
   try {
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (user?.push_token && user.push_token.startsWith('ExponentPushToken')) {
-      await axios.post('https://exp.host/--/api/v2/push/send', {
-        to: user.push_token,
-        title,
-        body,
-        data,
-        sound: 'default',
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { push_token: true }
+    });
+    if (!isExpoPushToken(user?.push_token)) return;
+
+    const response = await axios.post('https://exp.host/--/api/v2/push/send', {
+      to: user.push_token,
+      title,
+      body,
+      data,
+      sound: 'default',
+    });
+
+    // Expo returns DeviceNotRegistered when a user uninstalls the app or the
+    // token is otherwise invalid. Clear it so future sends are skipped.
+    const ticket = response.data?.data;
+    if (ticket?.status === 'error' && ticket?.details?.error === 'DeviceNotRegistered') {
+      await prisma.user.updateMany({
+        where: { id: userId, push_token: user.push_token },
+        data: { push_token: null }
       });
     }
   } catch (error) {
@@ -208,7 +300,8 @@ app.post('/auth/signup', async (req, res) => {
             password_hash: passwordHash,
             push_token,
             referred_by: validReferralCode || existingUser.referred_by,
-            is_admin: normalizedEmail === ADMIN_EMAIL ? 1 : 0,
+            // Admin status is assigned out-of-band, never based only on a claimed email.
+            is_admin: 0,
             updated_at: BigInt(Date.now())
           }
         });
@@ -240,7 +333,7 @@ app.post('/auth/signup', async (req, res) => {
         avatar_color: '#'+Math.floor(Math.random()*16777215).toString(16),
         push_token,
         referred_by: validReferralCode,
-        is_admin: normalizedEmail === ADMIN_EMAIL ? 1 : 0,
+        is_admin: 0,
         created_at: BigInt(Date.now()),
         updated_at: BigInt(Date.now()),
       }
@@ -289,7 +382,7 @@ app.post('/auth/social', async (req, res) => {
     let verifiedName: string;
     let verifiedAvatarUrl: string | null = null;
 
-    if (idToken.startsWith('mock-')) {
+    if (process.env.NODE_ENV !== 'production' && idToken.startsWith('mock-')) {
       verifiedEmail = idToken.replace('mock-', '');
       verifiedName = fullName || verifiedEmail.split('@')[0];
     } else if (provider === 'google') {
@@ -384,10 +477,6 @@ app.post('/auth/social', async (req, res) => {
         }
       }
 
-      if (normalizedEmail === ADMIN_EMAIL && existingUser.is_admin !== 1) {
-        dataToUpdate.is_admin = 1;
-      }
-
       // Reactivate deactivated accounts on login
       if (existingUser.is_active === 0) {
         dataToUpdate.is_active = 1;
@@ -431,7 +520,7 @@ app.post('/auth/social', async (req, res) => {
         avatar_url: verifiedAvatarUrl,
         push_token,
         referred_by: validReferralCode,
-        is_admin: normalizedEmail === ADMIN_EMAIL ? 1 : 0,
+        is_admin: 0,
         created_at: BigInt(Date.now()),
         updated_at: BigInt(Date.now()),
       }
@@ -451,7 +540,7 @@ app.post('/auth/social', async (req, res) => {
 
 // --- USER SEARCH ROUTE (Protected) ---
 
-app.get('/api/users/search', async (req: AuthRequest, res) => {
+app.get('/api/users/search', authenticateToken as any, async (req: AuthRequest, res) => {
   const { email } = req.query;
   if (!email) return res.status(400).json({ error: 'Email parameter is required' });
 
@@ -479,7 +568,7 @@ app.get('/api/users/search', async (req: AuthRequest, res) => {
   }
 });
 
-app.post('/api/users/search-or-create', async (req: AuthRequest, res) => {
+app.post('/api/users/search-or-create', authenticateToken as any, async (req: AuthRequest, res) => {
   const { email, name, avatar_color } = req.body;
   if (!email) return res.status(400).json({ error: 'Email parameter is required' });
 
@@ -528,28 +617,6 @@ app.post('/api/users/search-or-create', async (req: AuthRequest, res) => {
 
 // --- SYNC ROUTES (Protected) ---
 
-const authenticateToken = (req: AuthRequest, res: any, next: any) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-  if (!token) return res.sendStatus(401);
-
-  jwt.verify(token, JWT_SECRET, async (err: any, user: any) => {
-    if (err) return res.sendStatus(403);
-    // Check if user account is deactivated
-    try {
-      const dbUser = await prisma.user.findUnique({ where: { id: user.userId }, select: { is_active: true } });
-      if (dbUser && dbUser.is_active === 0) {
-        return res.status(403).json({ error: 'Account deactivated. Please sign in again to reactivate.' });
-      }
-    } catch (e) {
-      // If DB check fails, allow request to proceed (fail-open for resilience)
-      console.warn('[Auth] Failed to check is_active status:', e);
-    }
-    req.user = user;
-    next();
-  });
-};
-
 // --- SECURITY & GROUP MEMBERSHIP UTILITIES ---
 
 async function isGroupMember(userId: string, groupId: string): Promise<boolean> {
@@ -576,6 +643,110 @@ async function isCommentGroupMember(userId: string, commentId: string): Promise<
   return isExpenseGroupMember(userId, comm.expense_id);
 }
 
+/**
+ * Validate the complete sync envelope before mutating any rows. The sync API
+ * accepts client-generated IDs, so authorization must be checked against both
+ * persisted groups and groups being created in this request.
+ */
+async function validateSyncPayload(payload: any, currentUserId: string): Promise<void> {
+  const groups = Array.isArray(payload.groups) ? payload.groups : [];
+  const groupMembers = Array.isArray(payload.groupMembers) ? payload.groupMembers : [];
+  const expenses = Array.isArray(payload.expenses) ? payload.expenses : [];
+  const payers = Array.isArray(payload.expensePayers) ? payload.expensePayers : [];
+  const shares = Array.isArray(payload.expenseShares) ? payload.expenseShares : [];
+  const settlements = Array.isArray(payload.settlements) ? payload.settlements : [];
+  const comments = Array.isArray(payload.comments) ? payload.comments : [];
+
+  const incomingMemberIds = new Map<string, Set<string>>();
+  for (const member of groupMembers) {
+    if (!member?.group_id || !member?.user_id) {
+      throw new Error('Invalid group member in sync payload');
+    }
+    if (!incomingMemberIds.has(member.group_id)) incomingMemberIds.set(member.group_id, new Set());
+    incomingMemberIds.get(member.group_id)!.add(member.user_id);
+  }
+
+  const authorizedGroupIds = new Set<string>();
+  for (const group of groups) {
+    if (!group?.id) throw new Error('Invalid group in sync payload');
+    const existing = await prisma.group.findUnique({ where: { id: group.id }, select: { id: true } });
+    if (existing) {
+      if (!(await isGroupMember(currentUserId, group.id))) {
+        throw new Error('Forbidden: sync payload contains a group you do not belong to');
+      }
+    } else if (!incomingMemberIds.get(group.id)?.has(currentUserId)) {
+      throw new Error('Forbidden: new groups must include the authenticated user');
+    }
+    authorizedGroupIds.add(group.id);
+  }
+
+  for (const member of groupMembers) {
+    if (authorizedGroupIds.has(member.group_id)) continue;
+    if (!(await isGroupMember(currentUserId, member.group_id))) {
+      throw new Error('Forbidden: sync payload contains unauthorized group membership');
+    }
+    authorizedGroupIds.add(member.group_id);
+  }
+
+  for (const expense of expenses) {
+    if (!expense?.id || !expense?.group_id) {
+      throw new Error('Forbidden: sync payload contains an unauthorized expense');
+    }
+    if (!authorizedGroupIds.has(expense.group_id)) {
+      if (!(await isGroupMember(currentUserId, expense.group_id))) {
+        throw new Error('Forbidden: sync payload contains an unauthorized expense');
+      }
+      authorizedGroupIds.add(expense.group_id);
+    }
+    if (expense.created_by && expense.created_by !== currentUserId) {
+      const creatorIsMember = await isGroupMember(expense.created_by, expense.group_id);
+      if (!creatorIsMember) throw new Error('Invalid expense creator');
+    }
+  }
+
+  const expenseGroupIds = new Map<string, string>();
+  for (const expense of expenses) expenseGroupIds.set(expense.id, expense.group_id);
+  for (const item of [...payers, ...shares]) {
+    const groupId = expenseGroupIds.get(item.expense_id) || (await prisma.expense.findUnique({
+      where: { id: item.expense_id }, select: { group_id: true }
+    }))?.group_id;
+    if (!groupId) {
+      throw new Error('Forbidden: sync payload contains an unauthorized expense component');
+    }
+    if (!authorizedGroupIds.has(groupId)) {
+      if (!(await isGroupMember(currentUserId, groupId))) {
+        throw new Error('Forbidden: sync payload contains an unauthorized expense component');
+      }
+      authorizedGroupIds.add(groupId);
+    }
+    const incomingMembers = incomingMemberIds.get(groupId);
+    const itemUserIsMember = incomingMembers?.has(item.user_id) || await isGroupMember(item.user_id, groupId);
+    if (!itemUserIsMember) throw new Error('Invalid expense participant');
+  }
+
+  for (const settlement of settlements) {
+    if (!settlement?.group_id) {
+      throw new Error('Forbidden: sync payload contains an unauthorized settlement');
+    }
+    if (!authorizedGroupIds.has(settlement.group_id) && !(await isGroupMember(currentUserId, settlement.group_id))) {
+      throw new Error('Forbidden: sync payload contains an unauthorized settlement');
+    }
+    authorizedGroupIds.add(settlement.group_id);
+    const payerIsMember = incomingMemberIds.get(settlement.group_id)?.has(settlement.payer_id) || await isGroupMember(settlement.payer_id, settlement.group_id);
+    const payeeIsMember = incomingMemberIds.get(settlement.group_id)?.has(settlement.payee_id) || await isGroupMember(settlement.payee_id, settlement.group_id);
+    if (!payerIsMember || !payeeIsMember) throw new Error('Invalid settlement participant');
+  }
+
+  for (const comment of comments) {
+    const groupId = comment?.expense_id ? expenseGroupIds.get(comment.expense_id) || (await prisma.expense.findUnique({
+      where: { id: comment.expense_id }, select: { group_id: true }
+    }))?.group_id : undefined;
+    if (!groupId || !authorizedGroupIds.has(groupId) || comment.user_id !== currentUserId) {
+      throw new Error('Forbidden: sync comments must belong to an authorized expense and current user');
+    }
+  }
+}
+
 // --- FILE UPLOAD ROUTE ---
 
 app.post('/api/upload', authenticateToken as any, async (req: AuthRequest, res) => {
@@ -586,7 +757,13 @@ app.post('/api/upload', authenticateToken as any, async (req: AuthRequest, res) 
 
   try {
     const buffer = Buffer.from(base64, 'base64');
-    const ext = path.extname(name) || '.jpg';
+    if (buffer.length === 0 || buffer.length > 5 * 1024 * 1024) {
+      return res.status(413).json({ error: 'Receipt image must be between 1 byte and 5 MB' });
+    }
+    const ext = path.extname(String(name)).toLowerCase();
+    if (!['.jpg', '.jpeg', '.png', '.webp', '.heic'].includes(ext)) {
+      return res.status(400).json({ error: 'Unsupported receipt image type' });
+    }
     const filename = `${uuidv4()}${ext}`;
     const uploadDir = path.join(__dirname, 'public', 'uploads');
 
@@ -610,6 +787,8 @@ app.post('/api/sync/push', authenticateToken as any, async (req: AuthRequest, re
   const currentUserId = req.user.userId;
 
   try {
+    await validateSyncPayload(req.body, currentUserId);
+
     // Users
     if (users) {
       for (const u of users) {
@@ -822,7 +1001,9 @@ app.post('/api/sync/push', authenticateToken as any, async (req: AuthRequest, re
     res.json({ success: true });
   } catch (error) {
     console.error('Push Error:', error);
-    res.status(500).json({ success: false, error: String(error) });
+    const message = String(error instanceof Error ? error.message : error);
+    const status = message.startsWith('Forbidden') ? 403 : message.startsWith('Invalid') ? 400 : 500;
+    res.status(status).json({ success: false, error: message });
   }
 });
 
@@ -1137,7 +1318,7 @@ app.get('/api/users/me', authenticateToken as any, async (req: AuthRequest, res)
       where: { id: req.user.userId }
     });
     if (!user) return res.status(404).json({ error: 'User not found' });
-    res.json(user);
+    res.json(publicUser(user));
   } catch (error) {
     res.status(500).json({ error: String(error) });
   }
@@ -1161,6 +1342,23 @@ app.put('/api/users/me', authenticateToken as any, async (req: AuthRequest, res)
       data: cleanUpdates
     });
     res.json(user);
+  } catch (error) {
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+app.put('/api/users/me/push-token', authenticateToken as any, async (req: AuthRequest, res) => {
+  try {
+    const { pushToken } = req.body;
+    if (pushToken !== null && !isExpoPushToken(pushToken)) {
+      return res.status(400).json({ error: 'Invalid Expo push token' });
+    }
+
+    await prisma.user.update({
+      where: { id: req.user.userId },
+      data: { push_token: pushToken || null, updated_at: BigInt(Date.now()) }
+    });
+    res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: String(error) });
   }
@@ -1283,6 +1481,7 @@ app.post('/api/users/friends', authenticateToken as any, async (req: AuthRequest
       });
     }
 
+    let createdPendingRequest = false;
     if (friendUser.id !== req.user.userId) {
       const existingFriendship = await prisma.friendship.findUnique({
         where: {
@@ -1303,6 +1502,7 @@ app.post('/api/users/friends', authenticateToken as any, async (req: AuthRequest
             status: status
           }
         });
+        createdPendingRequest = status === 'pending';
       } else if (existingFriendship.status !== 'accepted' && !isRealUser) {
         await prisma.friendship.update({
           where: {
@@ -1314,6 +1514,16 @@ app.post('/api/users/friends', authenticateToken as any, async (req: AuthRequest
           data: { status: 'accepted' }
         });
       }
+    }
+
+    if (createdPendingRequest) {
+      const actor = await prisma.user.findUnique({ where: { id: req.user.userId }, select: { name: true } });
+      void sendPushNotification(
+        friendUser.id,
+        'New Friend Request',
+        `${actor?.name || 'Someone'} added you as a friend on Splitmaro.`,
+        { type: 'friend_request', userId: req.user.userId }
+      );
     }
 
     res.json({
@@ -1370,6 +1580,14 @@ app.post('/api/users/friends/:id/accept', authenticateToken as any, async (req: 
       });
     }
 
+    const accepter = await prisma.user.findUnique({ where: { id: req.user.userId }, select: { name: true } });
+    void sendPushNotification(
+      id,
+      'Friend Request Accepted',
+      `${accepter?.name || 'A friend'} accepted your friend request.`,
+      { type: 'friend_accepted', userId: req.user.userId }
+    );
+
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: String(error) });
@@ -1415,11 +1633,9 @@ app.delete('/api/users/friends/:id', authenticateToken as any, async (req: AuthR
 app.get('/api/users/:id', authenticateToken as any, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params as { id: string };
-    const user = await prisma.user.findUnique({
-      where: { id }
-    });
+    const user = await prisma.user.findUnique({ where: { id } });
     if (!user) return res.status(404).json({ error: 'User not found' });
-    res.json(user);
+    res.json(publicUser(user));
   } catch (error) {
     res.status(500).json({ error: String(error) });
   }
@@ -1428,6 +1644,9 @@ app.get('/api/users/:id', authenticateToken as any, async (req: AuthRequest, res
 app.put('/api/users/:id', authenticateToken as any, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params as { id: string };
+    if (id !== req.user.userId) {
+      return res.status(403).json({ error: 'You may only update your own profile' });
+    }
     const updates = req.body;
     const cleanUpdates: any = {};
     if (updates.name !== undefined) cleanUpdates.name = updates.name;
@@ -1443,7 +1662,7 @@ app.put('/api/users/:id', authenticateToken as any, async (req: AuthRequest, res
       where: { id },
       data: cleanUpdates
     });
-    res.json(user);
+    res.json(publicUser(user));
   } catch (error) {
     res.status(500).json({ error: String(error) });
   }
@@ -1534,6 +1753,18 @@ app.post('/api/groups', authenticateToken as any, async (req: AuthRequest, res) 
       }
     });
 
+    const actor = await prisma.user.findUnique({ where: { id: req.user.userId }, select: { name: true } });
+    await Promise.all(
+      allMemberIds
+        .filter(userId => userId !== req.user.userId)
+        .map(userId => sendPushNotification(
+          userId,
+          'Added to a Group',
+          `${actor?.name || 'Someone'} added you to “${group.name}”.`,
+          { type: 'group_member_added', groupId: group.id }
+        ))
+    );
+
     res.json({
       id: group.id,
       name: group.name,
@@ -1621,6 +1852,9 @@ app.post('/api/groups/:id/members', authenticateToken as any, async (req: AuthRe
     if (!isMember) return res.status(403).json({ error: 'Forbidden: You are not a member of this group' });
 
     const now = Date.now();
+    const existingMember = await prisma.groupMember.findUnique({
+      where: { group_id_user_id: { group_id: id, user_id: userId } }
+    });
     await prisma.groupMember.upsert({
       where: { group_id_user_id: { group_id: id, user_id: userId } },
       update: {},
@@ -1630,6 +1864,18 @@ app.post('/api/groups/:id/members', authenticateToken as any, async (req: AuthRe
       where: { id },
       data: { updated_at: BigInt(now) }
     });
+    if (!existingMember && userId !== req.user.userId) {
+      const [group, actor] = await Promise.all([
+        prisma.group.findUnique({ where: { id }, select: { name: true } }),
+        prisma.user.findUnique({ where: { id: req.user.userId }, select: { name: true } })
+      ]);
+      void sendPushNotification(
+        userId,
+        'Added to a Group',
+        `${actor?.name || 'Someone'} added you to “${group?.name || 'a Splitmaro group'}”.`,
+        { type: 'group_member_added', groupId: id }
+      );
+    }
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: String(error) });
@@ -1912,6 +2158,22 @@ app.post('/api/expenses', authenticateToken as any, async (req: AuthRequest, res
         data: { updated_at: BigInt(now) }
       });
     });
+
+    const [group, members, actor] = await Promise.all([
+      prisma.group.findUnique({ where: { id: input.groupId }, select: { name: true } }),
+      prisma.groupMember.findMany({ where: { group_id: input.groupId }, select: { user_id: true } }),
+      prisma.user.findUnique({ where: { id: req.user.userId }, select: { name: true } })
+    ]);
+    await Promise.all(
+      members
+        .filter(member => member.user_id !== req.user.userId)
+        .map(member => sendPushNotification(
+          member.user_id,
+          'New Expense Added',
+          `${actor?.name || 'Someone'} added “${input.description}” (${input.currency || 'INR'} ${Number(input.amount).toFixed(2)}) to ${group?.name || 'your group'}.`,
+          { type: 'expense_added', expenseId: id, groupId: input.groupId }
+        ))
+    );
 
     res.json(id);
   } catch (error) {
@@ -2711,6 +2973,9 @@ app.post('/api/create-order', authenticateToken as any, async (req: AuthRequest,
     const keySecret = process.env.RAZORPAY_KEY_SECRET;
 
     if (!keyId || !keySecret) {
+      if (process.env.NODE_ENV === 'production') {
+        return res.status(503).json({ error: 'Payment provider is not configured' });
+      }
       console.log('[Create Order] Razorpay keys not configured. Returning mock order.');
       return res.json({
         order_id: 'order_mock_' + Math.random().toString(36).substring(2, 10),
@@ -2755,7 +3020,11 @@ app.post('/api/verify-payment', authenticateToken as any, async (req: AuthReques
     }
 
     const keySecret = process.env.RAZORPAY_KEY_SECRET;
-    const isSandbox = !process.env.RAZORPAY_KEY_ID || !keySecret || razorpay_signature === 'sandbox-sig';
+    const isSandbox = process.env.NODE_ENV !== 'production' && (!process.env.RAZORPAY_KEY_ID || !keySecret || razorpay_signature === 'sandbox-sig');
+
+    if (process.env.NODE_ENV === 'production' && (!process.env.RAZORPAY_KEY_ID || !keySecret)) {
+      return res.status(503).json({ error: 'Payment provider is not configured' });
+    }
 
     if (!isSandbox) {
       const payload = `${razorpay_order_id}|${razorpay_payment_id}`;
@@ -2830,33 +3099,35 @@ app.post('/api/verify-payment', authenticateToken as any, async (req: AuthReques
 });
 
 app.post('/api/payment/upgrade-free', authenticateToken as any, async (req: AuthRequest, res) => {
-  try {
-    const userId = req.user.userId;
-    await prisma.user.update({
-      where: { id: userId },
-      data: { is_pro: 1, updated_at: BigInt(Date.now()) }
-    });
-
-    try {
-      await sendPushNotification(userId, 'Splitmaro Pro Activated! 💎', 'Thank you for upgrading. Enjoy premium features!');
-    } catch (pushErr) {
-      console.error('Failed to send push notification:', pushErr);
-    }
-
-    return res.json({ success: true, message: 'Profile upgraded to Pro successfully' });
-  } catch (error) {
-    console.error('Upgrade Free Error:', error);
-    res.status(500).json({ error: String(error) });
-  }
+  return res.status(410).json({ error: 'Free Pro upgrades are no longer available' });
 });
 
 app.post('/api/payment/revenuecat-sync', authenticateToken as any, async (req: AuthRequest, res) => {
   try {
     const userId = req.user.userId;
-    // Accept the real App Store price forwarded from the client
-    const { amount: bodyAmount, currency: bodyCurrency } = req.body || {};
-    const purchaseAmount = typeof bodyAmount === 'number' && bodyAmount > 0 ? bodyAmount : 499.00;
-    const purchaseCurrency = typeof bodyCurrency === 'string' && bodyCurrency.length > 0 ? bodyCurrency.toUpperCase() : 'INR';
+    const revenueCatApiKey = process.env.REVENUECAT_SECRET_API_KEY;
+    if (!revenueCatApiKey) {
+      return res.status(503).json({ error: 'RevenueCat verification is not configured' });
+    }
+
+    const subscriber = await axios.get(
+      `https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(userId)}`,
+      { headers: { Authorization: `Bearer ${revenueCatApiKey}` } }
+    );
+    const entitlements = subscriber.data?.subscriber?.entitlements || {};
+    const entitlementIds = (process.env.REVENUECAT_ENTITLEMENT_IDS || 'pro,splitmaro Pro')
+      .split(',').map(value => value.trim()).filter(Boolean);
+    const now = Date.now();
+    const activeEntitlement = entitlementIds
+      .map(id => entitlements[id])
+      .find(entitlement => entitlement && (!entitlement.expires_date || Date.parse(entitlement.expires_date) > now));
+    if (!activeEntitlement) {
+      return res.status(403).json({ error: 'No active RevenueCat Pro entitlement found' });
+    }
+
+    const productId = activeEntitlement.product_identifier || 'revenuecat_pro';
+    const purchaseAmount = 0;
+    const purchaseCurrency = 'USD';
     
     const user = await prisma.user.update({
       where: { id: userId },
@@ -2880,7 +3151,7 @@ app.post('/api/payment/revenuecat-sync', authenticateToken as any, async (req: A
             currency: purchaseCurrency,
             status: 'completed',
             provider: 'revenuecat_apple_iap',
-            razorpay_payment_id: 'rc_apple_' + Math.random().toString(36).substring(2, 10),
+            razorpay_payment_id: `rc_${userId}_${productId}`.slice(0, 190),
             created_at: BigInt(Date.now())
           }
         });
@@ -2904,6 +3175,25 @@ app.post('/api/payment/revenuecat-sync', authenticateToken as any, async (req: A
     return res.json({ success: true, user: cleanUser });
   } catch (error) {
     console.error('RevenueCat Sync Error:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+app.get('/api/payment/status', authenticateToken as any, async (req: AuthRequest, res) => {
+  try {
+    const [user, latestPurchase] = await Promise.all([
+      prisma.user.findUnique({ where: { id: req.user.userId }, select: { is_pro: true } }),
+      prisma.purchase.findFirst({
+        where: { user_id: req.user.userId, status: { in: ['success', 'completed'] } },
+        orderBy: { created_at: 'desc' },
+        select: { provider: true, amount: true, currency: true, created_at: true }
+      })
+    ]);
+    res.json({
+      isPro: user?.is_pro === 1,
+      purchase: latestPurchase ? { ...latestPurchase, created_at: Number(latestPurchase.created_at) } : null
+    });
+  } catch (error) {
     res.status(500).json({ error: String(error) });
   }
 });
@@ -3448,6 +3738,9 @@ app.post('/api/groups/join', authenticateToken as any, async (req: AuthRequest, 
     const group = await prisma.group.findUnique({ where: { id: groupId } });
     if (!group) return res.status(404).json({ error: 'Group not found' });
 
+    const existingMember = await prisma.groupMember.findUnique({
+      where: { group_id_user_id: { group_id: groupId, user_id: req.user.userId } }
+    });
     await prisma.groupMember.upsert({
       where: { group_id_user_id: { group_id: groupId, user_id: req.user.userId } },
       update: {},
@@ -3458,6 +3751,16 @@ app.post('/api/groups/join', authenticateToken as any, async (req: AuthRequest, 
       where: { id: groupId },
       data: { updated_at: BigInt(now) }
     });
+
+    if (!existingMember && payload.referrerId && payload.referrerId !== req.user.userId) {
+      const member = await prisma.user.findUnique({ where: { id: req.user.userId }, select: { name: true } });
+      void sendPushNotification(
+        payload.referrerId,
+        'New Group Member',
+        `${member?.name || 'Someone'} joined your group “${group.name}”.`,
+        { type: 'group_member_joined', groupId }
+      );
+    }
 
     res.json({ success: true, groupId });
   } catch (error) {
@@ -3880,5 +4183,3 @@ const PORT = process.env.PORT || 3000;
 httpServer.listen(Number(PORT), '0.0.0.0', () => {
   console.log(`🚀 Splitmaro API listening on port ${PORT}`);
 });
-
-

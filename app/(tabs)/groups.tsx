@@ -12,8 +12,10 @@ import { formatCurrency, formatRelativeTime } from '@/lib/format';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
-import { Alert, DeviceEventEmitter, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, DeviceEventEmitter, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
+import { FlashList } from '@shopify/flash-list';
+import { AdBanner } from '@/components/AdBanner';
 import { getAllGroups, getGroupBalancesForCurrentUser, type Group } from '../../lib/database';
 import { pullFromCloud } from '../../lib/sync';
 
@@ -81,87 +83,89 @@ export default function GroupsScreen() {
           autoCapitalize="none"
         />
       </View>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
-        }
-        showsVerticalScrollIndicator={false}
-      >
-        {loading ? (
-          <View style={{ gap: Spacing.sm }}>
-            {[...Array(5)].map((_, i) => (
-              <Skeleton key={i} height={76} borderRadius={BorderRadius.xl} />
-            ))}
-          </View>
-        ) : (
-          <>
-            {filtered.map((group, index) => {
-          const cat = GroupCategoryColors[group.category] || GroupCategoryColors.other;
-          return (
-            <Animated.View key={group.id} entering={FadeInDown.delay(index * 80).springify()}>
-              <Card
-                onPress={() => router.push(`/group/${group.id}`)}
-                variant="default"
-                style={styles.groupCard}
-              >
-                <View style={styles.groupRow}>
-                  <View style={[styles.emojiBox, { backgroundColor: cat.color + '20' }]}>
-                    <Text style={styles.emoji}>{cat.emoji}</Text>
-                  </View>
-                  <View style={styles.groupInfo}>
-                    <Text style={[styles.groupName, { color: colors.text }]} numberOfLines={1}>
-                      {group.name}
-                    </Text>
-                    <View style={styles.groupMeta}>
-                      <View style={styles.memberBadge}>
-                        <Ionicons name="people-outline" size={12} color={colors.textTertiary} />
-                        <Text style={[styles.memberCount, { color: colors.textTertiary }]}>
-                          {group.member_count}
-                        </Text>
-                      </View>
-                      <Text style={[styles.dot, { color: colors.textTertiary }]}>·</Text>
-                      <Text style={[styles.timeAgo, { color: colors.textTertiary }]}>
-                        {formatRelativeTime(group.updated_at)}
-                      </Text>
+      <View style={{ flex: 1 }}>
+        <FlashList
+          data={loading ? [] : filtered}
+          renderItem={({ item: group, index }) => {
+            const cat = GroupCategoryColors[group.category] || GroupCategoryColors.other;
+            return (
+              <Animated.View key={group.id} entering={FadeInDown.delay(index * 80).springify()}>
+                <Card
+                  onPress={() => router.push(`/group/${group.id}`)}
+                  variant="default"
+                  style={styles.groupCard}
+                >
+                  <View style={styles.groupRow}>
+                    <View style={[styles.emojiBox, { backgroundColor: cat.color + '20' }]}>
+                      <Text style={styles.emoji}>{cat.emoji}</Text>
                     </View>
-                  </View>
-                  {(() => {
-                    const bal = balances[group.id];
-                    if (!bal || Math.abs(bal) < 0.01) return <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />;
-                    const isOwed = bal > 0;
-                    const balColor = isOwed ? '#1CC29F' : '#FF6B6B';
-                    return (
-                      <View style={styles.balanceChip}>
-                        <Text style={[styles.balanceLabel, { color: balColor }]}>
-                          {isOwed ? 'you get' : 'you owe'}
-                        </Text>
-                        <Text style={[styles.balanceAmt, { color: balColor }]}>
-                          {formatCurrency(Math.abs(bal))}
+                    <View style={styles.groupInfo}>
+                      <Text style={[styles.groupName, { color: colors.text }]} numberOfLines={1}>
+                        {group.name}
+                      </Text>
+                      <View style={styles.groupMeta}>
+                        <View style={styles.memberBadge}>
+                          <Ionicons name="people-outline" size={12} color={colors.textTertiary} />
+                          <Text style={[styles.memberCount, { color: colors.textTertiary }]}>
+                            {group.member_count}
+                          </Text>
+                        </View>
+                        <Text style={[styles.dot, { color: colors.textTertiary }]}>·</Text>
+                        <Text style={[styles.timeAgo, { color: colors.textTertiary }]}>
+                          {formatRelativeTime(group.updated_at)}
                         </Text>
                       </View>
-                    );
-                  })()}
-                </View>
-              </Card>
-            </Animated.View>
-          );
-        })}
-          </>
-        )}
-
-        {filtered.length === 0 && !loading && (
-          <EmptyState
-            icon="people-outline"
-            title="No Groups Yet"
-            subtitle="Create a group to start splitting expenses with friends, family, or roommates."
-            actionLabel="Create Group"
-            onAction={() => router.push('/group/create')}
-          />
-        )}
-
-        <View style={{ height: 100 }} />
-      </ScrollView>
+                    </View>
+                    {(() => {
+                      const bal = balances[group.id];
+                      if (!bal || Math.abs(bal) < 0.01) return <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />;
+                      const isOwed = bal > 0;
+                      const balColor = isOwed ? colors.positive : colors.negative;
+                      return (
+                        <View style={styles.balanceChip}>
+                          <Text style={[styles.balanceLabel, { color: balColor }]}>
+                            {isOwed ? 'you get' : 'you owe'}
+                          </Text>
+                          <Text style={[styles.balanceAmt, { color: balColor }]}>
+                            {formatCurrency(Math.abs(bal))}
+                          </Text>
+                        </View>
+                      );
+                    })()}
+                  </View>
+                </Card>
+              </Animated.View>
+            );
+          }}
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+          }
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            loading ? (
+              <View style={{ gap: Spacing.sm }}>
+                {[...Array(5)].map((_, i) => (
+                  <Skeleton key={i} height={76} borderRadius={BorderRadius.xl} />
+                ))}
+              </View>
+            ) : (
+              <EmptyState
+                icon="people-outline"
+                title="No Groups Yet"
+                subtitle="Create a group to start splitting expenses with friends, family, or roommates."
+                actionLabel="Create Group"
+                onAction={() => router.push('/group/create')}
+              />
+            )
+          }
+          ListFooterComponent={
+            <View style={{ height: 100 }}>
+              <AdBanner />
+            </View>
+          }
+        />
+      </View>
 
       <FAB
         onPress={() => router.push('/group/create')}
@@ -218,8 +222,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   groupName: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 17,
+    fontFamily: 'PlusJakartaSans_700Bold',
     marginBottom: 4,
   },
   groupMeta: {
@@ -252,7 +256,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   balanceAmt: {
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_700Bold',
   },
 });

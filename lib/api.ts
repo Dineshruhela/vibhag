@@ -1,6 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
-import { Platform } from 'react-native';
+import { Platform, DeviceEventEmitter } from 'react-native';
 
 let rawApiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 // Strip leading/trailing double quotes if they exist in the env variable
@@ -26,6 +26,12 @@ const TOKEN_KEY = '0b5b295c-1461-47fd-808f-822e827f39ca';
 /**
  * Enhanced fetch wrapper with robust error handling and network failure reporting.
  */
+let activeRequestsCount = 0;
+
+export function getActiveRequestsCount() {
+  return activeRequestsCount;
+}
+
 export async function apiRequest(path: string, options: RequestInit = {}) {
   const url = `${API_URL}${path}`;
   const token = await SecureStore.getItemAsync(TOKEN_KEY);
@@ -38,6 +44,10 @@ export async function apiRequest(path: string, options: RequestInit = {}) {
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
+
+  // Increment active requests count and emit loading event
+  activeRequestsCount++;
+  DeviceEventEmitter.emit('api_loading_change', true);
 
   try {
     const response = await fetch(url, {
@@ -72,6 +82,12 @@ export async function apiRequest(path: string, options: RequestInit = {}) {
       throw new Error(`Connection Error: Unable to reach the server at ${API_URL}. Please check your internet connection or server status.`);
     }
     throw error;
+  } finally {
+    // Decrement active requests count and emit finish event when everything is done
+    activeRequestsCount = Math.max(0, activeRequestsCount - 1);
+    if (activeRequestsCount === 0) {
+      DeviceEventEmitter.emit('api_loading_change', false);
+    }
   }
 }
 
@@ -87,6 +103,10 @@ export const api = {
     referralCode?: string;
   }) => apiRequest('/auth/social', { method: 'POST', body: JSON.stringify(data) }),
   push: (data: any) => apiRequest('/api/sync/push', { method: 'POST', body: JSON.stringify(data) }),
+  registerPushToken: (pushToken: string | null) => apiRequest('/api/users/me/push-token', {
+    method: 'PUT',
+    body: JSON.stringify({ pushToken }),
+  }),
   pull: (lastSync: number) => apiRequest(`/api/sync/pull?lastSync=${lastSync}`),
   searchOrCreateUser: (data: { email: string; name: string; avatar_color?: string }) => apiRequest('/api/users/search-or-create', { method: 'POST', body: JSON.stringify(data) }),
   setToken: (token: string) => SecureStore.setItemAsync(TOKEN_KEY, token),

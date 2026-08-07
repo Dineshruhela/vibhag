@@ -86,6 +86,31 @@ describe('Splitmaro API Integration Tests', () => {
     expect(res.body.success).toBe(true);
   });
 
+  test('GET /api/users/search - should require authentication', async () => {
+    const res = await request(API_URL)
+      .get('/api/users/search')
+      .query({ email: testEmail });
+
+    expect(res.status).toBe(401);
+  });
+
+  test('PUT /api/users/:id - should prevent editing another user', async () => {
+    const res = await request(API_URL)
+      .put(`/api/users/${crypto.randomUUID()}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Should Not Change' });
+
+    expect(res.status).toBe(403);
+  });
+
+  test('POST /api/payment/upgrade-free - should not grant free Pro access', async () => {
+    const res = await request(API_URL)
+      .post('/api/payment/upgrade-free')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(410);
+  });
+
   test('GET /api/sync/pull - should retrieve synced data', async () => {
     const res = await request(API_URL)
       .get('/api/sync/pull?lastSync=0')

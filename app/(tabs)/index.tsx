@@ -24,6 +24,7 @@ import {
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { AdBanner } from '@/components/AdBanner';
 import { getAllGroups, getCurrentUser, refreshCurrentUser, getOverallBalance, type Group, type User } from '../../lib/database';
 type Balance = { userId: string; userName: string; avatarColor: string; avatarUrl?: string | null; amount: number };
 
@@ -154,13 +155,7 @@ export default function DashboardScreen() {
             {/* Balance Summary Card */}
         <Animated.View entering={FadeInDown.delay(100).springify()}>
           <LinearGradient
-            colors={
-              netBalance > 0
-                ? ['#1CC29F', '#15967B']
-                : netBalance < 0
-                ? ['#FF6B6B', '#E05555']
-                : [colors.surface, colors.surface]
-            }
+            colors={[colors.primaryGradientStart, colors.primaryGradientEnd]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.balanceCard}
@@ -213,7 +208,7 @@ export default function DashboardScreen() {
                 <Text
                   style={[
                     styles.balanceItemAmount,
-                    { color: netBalance === 0 ? colors.primary : '#FFFFFF' },
+                    { color: '#00D4B8' },
                   ]}
                 >
                   {formatCurrency(totalOwed)}
@@ -238,7 +233,7 @@ export default function DashboardScreen() {
                 <Text
                   style={[
                     styles.balanceItemAmount,
-                    { color: netBalance === 0 ? colors.negative : '#FFFFFF' },
+                    { color: '#FF6B6B' },
                   ]}
                 >
                   {formatCurrency(totalOwe)}
@@ -397,6 +392,7 @@ export default function DashboardScreen() {
           </Animated.View>
         )}
 
+        <AdBanner />
         <View style={{ height: 100 }} />
         </>
         )}
@@ -417,7 +413,7 @@ const styles = StyleSheet.create({
   },
   headerLeft: { flex: 1 },
   greeting: { fontSize: 13, fontWeight: '500', marginBottom: 2 },
-  appTitle: { fontSize: 26, fontWeight: '800', letterSpacing: -0.5 },
+  appTitle: { fontSize: 26, fontFamily: 'PlusJakartaSans_800ExtraBold', letterSpacing: -0.5 },
   profileBtn: {
     borderRadius: 22,
     overflow: 'hidden',
@@ -438,8 +434,8 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   balanceAmount: {
-    fontSize: 34,
-    fontWeight: '800',
+    fontSize: 36,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
     letterSpacing: -1,
   },
   balanceSubtext: {
@@ -470,8 +466,8 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   balanceItemAmount: {
-    fontSize: 17,
-    fontWeight: '800',
+    fontSize: 18,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
   },
   quickActions: {
     flexDirection: 'row',
@@ -501,7 +497,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
     marginTop: Spacing.sm,
   },
-  sectionTitle: { fontSize: 18, fontWeight: '700' },
+  sectionTitle: { fontSize: 18, fontFamily: 'PlusJakartaSans_700Bold' },
   sectionLink: { fontSize: 13, fontWeight: '600' },
   balancePersonRow: {
     flexDirection: 'row',
@@ -529,6 +525,6 @@ const styles = StyleSheet.create({
   },
   groupEmojiText: { fontSize: 24 },
   groupInfo: { flex: 1 },
-  groupName: { fontSize: 15, fontWeight: '700' },
+  groupName: { fontSize: 16, fontFamily: 'PlusJakartaSans_700Bold' },
   groupMeta: { fontSize: 12, marginTop: 2 },
 });

@@ -24,6 +24,8 @@ import {
 import { BarChart } from 'react-native-chart-kit';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
+import { FlashList } from '@shopify/flash-list';
+import { AdBanner } from '@/components/AdBanner';
 import {
     deleteExpense,
     getAllExpenses,
@@ -227,53 +229,61 @@ export default function ActivityScreen() {
               clearButtonMode="while-editing"
             />
           </View>
-          <ScrollView
-            contentContainerStyle={styles.scroll}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await loadData(); setRefreshing(false); }} tintColor={colors.primary} />}
-            showsVerticalScrollIndicator={false}
-          >
-            {Object.entries(grouped).map(([date, items], gi) => (
-              <Animated.View key={date} entering={FadeInDown.delay(gi * 80).springify()}>
-                <Text style={[styles.dateHead, { color: colors.textSecondary }]}>{date}</Text>
-                <View style={[styles.card, { backgroundColor: colors.surface }]}>
-                  {items.map((exp, i) => {
-                    const cat = CategoryColors[exp.category] || CategoryColors.general;
-                    const renderRightActions = () => (
-                      <Pressable style={styles.deleteSwipeBtn} onPress={() => handleDeleteExpense(exp)}>
-                        <Ionicons name="trash-outline" size={24} color="#FFF" />
-                      </Pressable>
-                    );
-                    return (
-                      <Swipeable key={exp.id} renderRightActions={renderRightActions} overshootRight={false}>
-                        <Pressable
-                          onPress={() => router.push(`/group/expense/${exp.id}`)}
-                          style={[styles.row, i < items.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.borderLight }]}
-                        >
-                          <View style={[styles.icon, { backgroundColor: cat.color + '20' }]}>
-                            <Ionicons name={cat.icon as any} size={20} color={cat.color} />
-                          </View>
-                          <View style={styles.info}>
-                            <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>{exp.description}</Text>
-                            <Text style={[styles.meta, { color: colors.textTertiary }]}>
-                              {exp.creator_name || 'You'} · {exp.group_name || 'group'}
-                            </Text>
-                          </View>
-                          <View style={styles.right}>
-                            <Text style={[styles.amt, { color: colors.text }]}>{formatCurrency(exp.amount)}</Text>
-                            <Text style={[styles.time, { color: colors.textTertiary }]}>{formatRelativeTime(exp.created_at)}</Text>
-                          </View>
+          <View style={{ flex: 1 }}>
+            <FlashList
+              data={Object.entries(grouped)}
+              renderItem={({ item: [date, items], index: gi }) => (
+                <Animated.View entering={FadeInDown.delay(gi * 80).springify()}>
+                  <Text style={[styles.dateHead, { color: colors.textSecondary }]}>{date}</Text>
+                  <View style={[styles.card, { backgroundColor: colors.surface }]}>
+                    {items.map((exp, i) => {
+                      const cat = CategoryColors[exp.category] || CategoryColors.general;
+                      const renderRightActions = () => (
+                        <Pressable style={styles.deleteSwipeBtn} onPress={() => handleDeleteExpense(exp)}>
+                          <Ionicons name="trash-outline" size={24} color="#FFF" />
                         </Pressable>
-                      </Swipeable>
-                    );
-                  })}
+                      );
+                      return (
+                        <Swipeable key={exp.id} renderRightActions={renderRightActions} overshootRight={false}>
+                          <Pressable
+                            onPress={() => router.push(`/group/expense/${exp.id}`)}
+                            style={[styles.row, i < items.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.borderLight }]}
+                          >
+                            <View style={[styles.icon, { backgroundColor: cat.color + '20' }]}>
+                              <Ionicons name={cat.icon as any} size={20} color={cat.color} />
+                            </View>
+                            <View style={styles.info}>
+                              <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>{exp.description}</Text>
+                              <Text style={[styles.meta, { color: colors.textTertiary }]}>
+                                {exp.creator_name || 'You'} · {exp.group_name || 'group'}
+                              </Text>
+                            </View>
+                            <View style={styles.right}>
+                              <Text style={[styles.amt, { color: colors.text }]}>{formatCurrency(exp.amount)}</Text>
+                              <Text style={[styles.time, { color: colors.textTertiary }]}>{formatRelativeTime(exp.created_at)}</Text>
+                            </View>
+                          </Pressable>
+                        </Swipeable>
+                      );
+                    })}
+                  </View>
+                </Animated.View>
+              )}
+              contentContainerStyle={styles.scroll}
+              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await loadData(); setRefreshing(false); }} tintColor={colors.primary} />}
+              showsVerticalScrollIndicator={false}
+              ListEmptyComponent={
+                expenses.length === 0 && !loading ? (
+                  <EmptyState icon="receipt-outline" title="No Activity Yet" subtitle="Expenses will appear here." />
+                ) : null
+              }
+              ListFooterComponent={
+                <View style={{ height: 100 }}>
+                  <AdBanner />
                 </View>
-              </Animated.View>
-            ))}
-            {expenses.length === 0 && !loading && (
-              <EmptyState icon="receipt-outline" title="No Activity Yet" subtitle="Expenses will appear here." />
-            )}
-            <View style={{ height: 100 }} />
-          </ScrollView>
+              }
+            />
+          </View>
         </>
       )}
 
@@ -559,7 +569,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 16, fontWeight: '600', marginBottom: 2 },
   meta: { fontSize: 13 },
   right: { alignItems: 'flex-end', justifyContent: 'center' },
-  amt: { fontSize: 16, fontWeight: '700', marginBottom: 2 },
+  amt: { fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', marginBottom: 2 },
   time: { fontSize: 12 },
   deleteSwipeBtn: { backgroundColor: '#FF3B30', justifyContent: 'center', alignItems: 'center', width: 70 },
 
@@ -573,7 +583,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.lg,
     marginBottom: Spacing.md,
   },
-  monthLabel: { fontSize: 16, fontWeight: '700' },
+  monthLabel: { fontSize: 16, fontFamily: 'PlusJakartaSans_700Bold' },
   insightRow: { flexDirection: 'row', gap: Spacing.md, marginBottom: Spacing.lg },
   insightCard: {
     borderRadius: BorderRadius.xl,
@@ -581,20 +591,20 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 4,
   },
-  insightValue: { fontSize: 22, fontWeight: '800', marginTop: 4 },
+  insightValue: { fontSize: 22, fontFamily: 'PlusJakartaSans_800ExtraBold', marginTop: 4 },
   insightLabel: { fontSize: 12, fontWeight: '500' },
   chartCard: {
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
     marginBottom: Spacing.lg,
   },
-  sectionTitle: { fontSize: 16, fontWeight: '700', marginBottom: Spacing.md },
+  sectionTitle: { fontSize: 16, fontFamily: 'PlusJakartaSans_700Bold', marginBottom: Spacing.md },
   catRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6, gap: 8 },
   catDot: { width: 8, height: 8, borderRadius: 4 },
   catIconBox: { width: 24, height: 24, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
   catName: { flex: 1, fontSize: 14, fontWeight: '600' },
   catPct: { fontSize: 12, fontWeight: '500', width: 36, textAlign: 'right' },
-  catAmt: { fontSize: 14, fontWeight: '700', width: 72, textAlign: 'right' },
+  catAmt: { fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', width: 72, textAlign: 'right' },
   barTrack: { height: 6, borderRadius: 3, marginBottom: Spacing.md, overflow: 'hidden' },
   barFill: { height: 6, borderRadius: 3 },
   tipCard: {
@@ -625,9 +635,9 @@ const styles = StyleSheet.create({
   undoToastText: { fontSize: 14, fontWeight: '500' },
   undoToastAction: { fontSize: 14, fontWeight: '800', letterSpacing: 0.5 },
   budgetInputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: Spacing.md, borderRadius: BorderRadius.md, borderWidth: 1 },
-  budgetInput: { flex: 1, fontSize: 22, fontWeight: '800', padding: 0 },
+  budgetInput: { flex: 1, fontSize: 22, fontFamily: 'PlusJakartaSans_800ExtraBold', padding: 0 },
   budgetSummaryRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginBottom: 12 },
-  budgetSpent: { fontSize: 24, fontWeight: '800' },
+  budgetSpent: { fontSize: 24, fontFamily: 'PlusJakartaSans_800ExtraBold' },
   budgetBarTrack: { height: 10, borderRadius: 5, overflow: 'hidden' },
   budgetBarFill: { height: 10, borderRadius: 5 },
   budgetAlert: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderRadius: BorderRadius.md, borderWidth: 1, marginTop: 12 },

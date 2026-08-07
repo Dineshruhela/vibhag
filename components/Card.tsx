@@ -1,12 +1,15 @@
 /**
- * Card Component
- * Reusable card with consistent styling
+ * Card Component — v2
+ * Elevation-aware, animated, supports gradient accent bar
  */
-import React from 'react';
-import { View, StyleSheet, Pressable, ViewStyle } from 'react-native';
+import { pressIn, pressOut } from '@/constants/Motion';
+import { BorderRadius, Elevation, Spacing } from '@/constants/Spacing';
 import { useThemeColors } from '@/hooks/useThemeColor';
-import { BorderRadius, Spacing } from '@/constants/Spacing';
-import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
+import React from 'react';
+import { Pressable, StyleSheet, View, ViewStyle } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -14,47 +17,85 @@ type Props = {
   children: React.ReactNode;
   onPress?: () => void;
   style?: ViewStyle;
-  variant?: 'default' | 'elevated' | 'outlined';
+  variant?: 'default' | 'elevated' | 'outlined' | 'ghost';
   padding?: number;
+  /** Colored gradient accent strip at the top of the card */
+  accentColor?: string;
 };
 
-export function Card({ children, onPress, style, variant = 'default', padding = Spacing.base }: Props) {
+export function Card({ children, onPress, style, variant = 'default', padding = Spacing.base, accentColor }: Props) {
   const colors = useThemeColors();
   const scale = useSharedValue(1);
-  
+
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
-  
-  const cardStyle: ViewStyle = {
-    backgroundColor: colors.surface,
+
+  const baseStyle: ViewStyle = {
+    backgroundColor: 'transparent',
     borderRadius: BorderRadius.lg,
-    padding,
+    overflow: 'hidden',
     ...(variant === 'elevated' && {
-      shadowColor: colors.shadow,
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 1,
-      shadowRadius: 12,
-      elevation: 4,
+      ...Elevation.md,
+      shadowColor: colors.shadowColor,
     }),
     ...(variant === 'outlined' && {
-      borderWidth: 1,
+      borderWidth: StyleSheet.hairlineWidth,
       borderColor: colors.border,
     }),
+    ...(variant === 'default' && {
+      ...Elevation.sm,
+      shadowColor: colors.shadowColor,
+    }),
   };
-  
+
+  const inner = (
+    <BlurView
+      intensity={variant === 'ghost' ? 0 : 35}
+      tint="dark"
+      style={[
+        {
+          flex: 1,
+          padding,
+          backgroundColor: variant === 'ghost' ? 'transparent' : colors.glass,
+          borderColor: colors.borderLight,
+          borderWidth: variant === 'ghost' ? 0 : 1,
+        },
+      ]}
+    >
+      {accentColor && (
+        <LinearGradient
+          colors={[accentColor, accentColor + 'CC']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.accent}
+        />
+      )}
+      {children}
+    </BlurView>
+  );
+
   if (onPress) {
     return (
       <AnimatedPressable
         onPress={onPress}
-        onPressIn={() => { scale.value = withSpring(0.97, { damping: 15, stiffness: 300 }); }}
-        onPressOut={() => { scale.value = withSpring(1, { damping: 15, stiffness: 300 }); }}
-        style={[cardStyle, animatedStyle, style]}
+        onPressIn={() => { scale.value = pressIn(); }}
+        onPressOut={() => { scale.value = pressOut(); }}
+        style={[baseStyle, animatedStyle, style]}
       >
-        {children}
+        {inner}
       </AnimatedPressable>
     );
   }
-  
-  return <View style={[cardStyle, style]}>{children}</View>;
+
+  return <View style={[baseStyle, style]}>{inner}</View>;
 }
+
+const styles = StyleSheet.create({
+  accent: {
+    height: 3,
+    marginHorizontal: -Spacing.base,
+    marginTop: -Spacing.base,
+    marginBottom: Spacing.md,
+  },
+});

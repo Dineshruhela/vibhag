@@ -18,6 +18,7 @@ import React, { useCallback, useState } from 'react';
 import { Alert, DeviceEventEmitter, Linking, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import Animated, { FadeInDown } from 'react-native-reanimated';
+import { FlashList } from '@shopify/flash-list';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
     calculateGroupBalances,
@@ -261,29 +262,11 @@ export default function GroupDetailScreen() {
         ))}
       </View>
 
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={async () => {
-              setRefreshing(true);
-              try {
-                await require('@/lib/sync').pullFromCloud();
-              } catch (e) {
-                console.warn('[GroupDetail] Pull to refresh cloud sync failed:', e);
-              }
-              await load();
-              setRefreshing(false);
-            }}
-            tintColor={colors.primary}
-          />
-        }
-        showsVerticalScrollIndicator={false}
-      >
-        {tab === 'expenses' && (
-          <>
-            {expenses.map((exp, i) => {
+      {tab === 'expenses' ? (
+        <View style={{ flex: 1 }}>
+          <FlashList
+            data={expenses}
+            renderItem={({ item: exp, index: i }) => {
               const catC = CategoryColors[exp.category] || CategoryColors.general;
               const det = expenseDetails[exp.id] || { iPaid: 0, myShare: 0 };
               const net = det.iPaid - det.myShare;
@@ -295,7 +278,7 @@ export default function GroupDetailScreen() {
               );
 
               return (
-                <Animated.View key={exp.id} entering={FadeInDown.delay(i * 50).springify()}>
+                <Animated.View entering={FadeInDown.delay(i * 50).springify()}>
                   <Swipeable renderRightActions={renderRightActions} overshootRight={false} containerStyle={{ marginBottom: 12 }}>
                     <Pressable onPress={() => router.push(`/group/expense/${exp.id}`)} style={[styles.expRow, { backgroundColor: colors.surface }]}>
                       <View style={[styles.expIcon, { backgroundColor: catC.color + '20' }]}>
@@ -331,14 +314,52 @@ export default function GroupDetailScreen() {
                   </Swipeable>
                 </Animated.View>
               );
-            })}
-            {expenses.length === 0 && (
+            }}
+            contentContainerStyle={styles.scroll}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={async () => {
+                  setRefreshing(true);
+                  try {
+                    await require('@/lib/sync').pullFromCloud();
+                  } catch (e) {
+                    console.warn('[GroupDetail] Pull to refresh cloud sync failed:', e);
+                  }
+                  await load();
+                  setRefreshing(false);
+                }}
+                tintColor={colors.primary}
+              />
+            }
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
               <EmptyState icon="receipt-outline" title="No Expenses" subtitle="Add an expense to start tracking." actionLabel="Add Expense" onAction={() => router.push({ pathname: '/group/add-expense', params: { groupId: id } })} />
-            )}
-          </>
-        )}
-
-        {tab === 'balances' && (
+            }
+            ListFooterComponent={<View style={{ height: 100 }} />}
+          />
+        </View>
+      ) : (
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={async () => {
+                setRefreshing(true);
+                try {
+                  await require('@/lib/sync').pullFromCloud();
+                } catch (e) {
+                  console.warn('[GroupDetail] Pull to refresh cloud sync failed:', e);
+                }
+                await load();
+                setRefreshing(false);
+              }}
+              tintColor={colors.primary}
+            />
+          }
+          showsVerticalScrollIndicator={false}
+        >
           <>
             {/* Per-member balances */}
             <Text style={[styles.secTitle, { color: colors.text }]}>Member Balances</Text>
@@ -400,9 +421,9 @@ export default function GroupDetailScreen() {
               </>
             )}
           </>
-        )}
-        <View style={{ height: 100 }} />
-      </ScrollView>
+          <View style={{ height: 100 }} />
+        </ScrollView>
+      )}
 
       <FAB
         onPress={() => router.push({ pathname: '/group/add-expense', params: { groupId: id } })}

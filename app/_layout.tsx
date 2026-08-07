@@ -1,21 +1,37 @@
 /**
  * Root Layout for Splitmaro
  */
+import { ToastProvider } from '@/components/Toast';
+import { Colors } from '@/constants/Colors';
+import { useColorScheme } from '@/hooks/useColorScheme';
+import { useNotifications } from '@/hooks/useNotifications';
+import { useSync } from '@/hooks/useSync';
+import {
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+  Inter_800ExtraBold,
+} from '@expo-google-fonts/inter';
+import {
+  PlusJakartaSans_400Regular,
+  PlusJakartaSans_500Medium,
+  PlusJakartaSans_600SemiBold,
+  PlusJakartaSans_700Bold,
+  PlusJakartaSans_800ExtraBold,
+} from '@expo-google-fonts/plus-jakarta-sans';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
+import * as Linking from 'expo-linking';
 import { Stack, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
-import * as Linking from 'expo-linking';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { DeviceEventEmitter, Platform } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
-import { useColorScheme } from '@/hooks/useColorScheme';
-import { Colors } from '@/constants/Colors';
-import { useNotifications } from '@/hooks/useNotifications';
-import { useSync } from '@/hooks/useSync';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useEffect, useRef, useState } from 'react';
+import { Animated, DeviceEventEmitter, Platform, StyleSheet } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync().catch(() => {
@@ -50,7 +66,18 @@ const SplitmaroLightTheme = {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
-  const [loaded] = useFonts({});
+  const [loaded] = useFonts({
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+    Inter_800ExtraBold,
+    PlusJakartaSans_400Regular,
+    PlusJakartaSans_500Medium,
+    PlusJakartaSans_600SemiBold,
+    PlusJakartaSans_700Bold,
+    PlusJakartaSans_800ExtraBold,
+  });
   const router = useRouter();
   useNotifications();
   useSync();
@@ -152,7 +179,9 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <ThemeProvider value={colorScheme === 'dark' ? SplitmaroDarkTheme : SplitmaroLightTheme}>
+      <ToastProvider>
+      <ThemeProvider value={SplitmaroDarkTheme}>
+        <GlobalProgressBar />
         <Stack
         screenOptions={{
           headerShown: false,
@@ -278,8 +307,81 @@ export default function RootLayout() {
         />
         <Stack.Screen name="+not-found" />
       </Stack>
-      <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+      <StatusBar style="light" />
     </ThemeProvider>
+    </ToastProvider>
     </GestureHandlerRootView>
   );
 }
+
+function GlobalProgressBar() {
+  const [loading, setLoading] = useState(false);
+  const progress = useRef(new Animated.Value(0)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+  const insets = useSafeAreaInsets();
+
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('api_loading_change', (isLoading: boolean) => {
+      if (isLoading) {
+        setLoading(true);
+        Animated.parallel([
+          Animated.timing(opacity, {
+            toValue: 1,
+            duration: 150,
+            useNativeDriver: false,
+          }),
+          Animated.timing(progress, {
+            toValue: 0.85,
+            duration: 1200,
+            useNativeDriver: false,
+          }),
+        ]).start();
+      } else {
+        Animated.timing(progress, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: false,
+        }).start(() => {
+          Animated.timing(opacity, {
+            toValue: 0,
+            duration: 150,
+            useNativeDriver: false,
+          }).start(() => {
+            progress.setValue(0);
+            setLoading(false);
+          });
+        });
+      }
+    });
+
+    return () => sub.remove();
+  }, [progress, opacity]);
+
+  if (!loading) return null;
+
+  const width = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '100%'],
+  });
+
+  return (
+    <Animated.View style={[styles.progressContainer, { top: insets.top, opacity }]}>
+      <Animated.View style={[styles.progressBar, { width }]} />
+    </Animated.View>
+  );
+}
+
+const styles = StyleSheet.create({
+  progressContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 3,
+    backgroundColor: 'rgba(28, 194, 159, 0.1)',
+    zIndex: 99999,
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: '#1CC29F',
+  },
+});
