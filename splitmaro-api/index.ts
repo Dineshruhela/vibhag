@@ -4276,3 +4276,21 @@ const PORT = process.env.PORT || 3000;
 httpServer.listen(Number(PORT), '0.0.0.0', () => {
   console.log(`🚀 Splitmaro API listening on port ${PORT}`);
 });
+
+// Graceful shutdown handler to close Prisma connections cleanly on Railway container updates
+const handleGracefulShutdown = async (signal: string) => {
+  console.log(`[Server] Received ${signal}. Disconnecting Prisma & shutting down...`);
+  try {
+    await prisma.$disconnect();
+    httpServer.close(() => {
+      console.log('[Server] HTTP server closed gracefully.');
+      process.exit(0);
+    });
+  } catch (e) {
+    console.error('[Server] Error during shutdown:', e);
+    process.exit(1);
+  }
+};
+
+process.on('SIGINT', () => handleGracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => handleGracefulShutdown('SIGTERM'));
