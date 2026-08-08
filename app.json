@@ -2,7 +2,7 @@
   "expo": {
     "name": "Splitmaro",
     "slug": "vibhag",
-    "version": "1.0.5",
+    "version": "1.0.6",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "splitmaro",
@@ -17,7 +17,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.dineshruhela.vibhag",
       "usesAppleSignIn": true,
-      "buildNumber": "4",
+      "buildNumber": "32",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       },
@@ -30,7 +30,7 @@
       },
       "edgeToEdgeEnabled": true,
       "package": "com.dineshruhela.vibhag",
-      "versionCode": 11
+      "versionCode": 32
     },
     "web": {
       "bundler": "metro",

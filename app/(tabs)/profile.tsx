@@ -16,6 +16,7 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Alert, DeviceEventEmitter, Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
+import Constants from 'expo-constants';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { clearAllLocalData, clearLocalDatabase, getCurrentUser, refreshCurrentUser, updateUser, deactivateAccount, type User } from '../../lib/database';
 import { pullFromCloud } from '../../lib/sync';
@@ -359,7 +360,9 @@ export default function ProfileScreen() {
               </View>
               <View style={styles.infoTextContainer}>
                 <Text style={[styles.infoTitle, { color: colors.text }]}>Splitmaro</Text>
-                <Text style={[styles.infoSub, { color: colors.textTertiary }]}>Version 1.0.4</Text>
+                <Text style={[styles.infoSub, { color: colors.textTertiary }]}>
+                  Version {Constants.expoConfig?.version || '1.0.5'}
+                </Text>
               </View>
             </View>
             <Pressable

@@ -57,14 +57,30 @@ export async function apiRequest(path: string, options: RequestInit = {}) {
 
     if (!response.ok) {
       const text = await response.text();
-      let errMsg = text || response.statusText;
-      try {
-        const parsed = JSON.parse(text);
-        if (parsed.error) {
-          errMsg = parsed.error;
+      let errMsg = response.statusText || `Server Error (${response.status})`;
+
+      // If response is HTML (e.g. Cloudflare 502 Bad Gateway), clean it up into a human-readable message
+      if (text.startsWith('<!DOCTYPE') || text.includes('<html')) {
+        if (response.status === 502) {
+          errMsg = 'Server is currently undergoing maintenance (502 Bad Gateway). Please try again in a few moments.';
+        } else if (response.status === 503) {
+          errMsg = 'Server is temporarily unavailable (503 Service Unavailable). Please try again shortly.';
+        } else if (response.status === 504) {
+          errMsg = 'Server connection timed out (504 Gateway Timeout). Please try again.';
+        } else {
+          errMsg = `Server returned an error (${response.status}). Please try again later.`;
         }
-      } catch (e) {
-        // Fallback to raw text or statusText
+      } else {
+        try {
+          const parsed = JSON.parse(text);
+          if (parsed.error) {
+            errMsg = parsed.error;
+          }
+        } catch (e) {
+          if (text.trim().length > 0 && text.length < 200) {
+            errMsg = text.trim();
+          }
+        }
       }
       throw new Error(errMsg);
     }

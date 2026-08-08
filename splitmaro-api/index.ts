@@ -974,6 +974,8 @@ app.post('/api/sync/push', authenticateToken as any, async (req: AuthRequest, re
       if (settlements) settlements.forEach((s: any) => groupIds.add(s.group_id));
 
       if (groupIds.size > 0) {
+        const actor = await prisma.user.findUnique({ where: { id: currentUserId }, select: { name: true } });
+
         for (const gid of groupIds) {
           const members = await prisma.groupMember.findMany({
             where: { group_id: gid },
@@ -985,12 +987,30 @@ app.post('/api/sync/push', authenticateToken as any, async (req: AuthRequest, re
               // Send socket real-time update
               io.to(member.user_id).emit('data_changed', { type: 'sync', groupId: gid });
 
-              // Send push notifications only for truly new additions
-              if (newExpenses.length > 0 && newExpenses.some((e: any) => e.group_id === gid)) {
-                const expense = newExpenses.find((e: any) => e.group_id === gid);
-                sendPushNotification(member.user_id, 'New Expense!', `Someone added "${expense.description}" of ${expense.amount}`);
-              } else if (newMembers.length > 0 && newMembers.some((nm: any) => nm.group_id === gid && nm.user_id === member.user_id)) {
-                sendPushNotification(member.user_id, 'Added to Group!', `You were added to the group "${member.group?.name || 'New Group'}"`);
+              // Send push notifications for newly created expenses
+              if (newExpenses.length > 0) {
+                const groupNewExpenses = newExpenses.filter((e: any) => e.group_id === gid);
+                for (const expense of groupNewExpenses) {
+                  const curr = expense.currency === 'USD' ? '$' : expense.currency === 'EUR' ? '€' : '₹';
+                  const formattedAmt = `${curr}${Number(expense.amount).toFixed(2)}`;
+                  const groupName = member.group?.name ? ` to "${member.group.name}"` : '';
+                  void sendPushNotification(
+                    member.user_id,
+                    'New Expense Added! 💸',
+                    `${actor?.name || 'A friend'} added "${expense.description}" (${formattedAmt})${groupName}.`,
+                    { type: 'expense_added', expenseId: expense.id, groupId: gid }
+                  );
+                }
+              }
+
+              // Send push notification when added to a new group
+              if (newMembers.length > 0 && newMembers.some((nm: any) => nm.group_id === gid && nm.user_id === member.user_id)) {
+                void sendPushNotification(
+                  member.user_id,
+                  'Added to Group! 👥',
+                  `${actor?.name || 'Someone'} added you to the group "${member.group?.name || 'Group'}".`,
+                  { type: 'group_member_added', groupId: gid }
+                );
               }
             }
           }

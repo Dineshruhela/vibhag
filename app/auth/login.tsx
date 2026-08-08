@@ -114,12 +114,24 @@ export default function LoginScreen() {
 
     setLoading(true);
     try {
+      const config: any = {
+        webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '73461724779-fcb6mscp9nhdd4etehrsfepohn17d5jf.apps.googleusercontent.com',
+        offlineAccess: false,
+      };
+      if (Platform.OS === 'ios') {
+        config.iosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || '73461724779-cbv3g71eo7onj12foo61gs3u75cgc2ct.apps.googleusercontent.com';
+      }
+      GoogleSignin.configure(config);
+
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
       const response = await GoogleSignin.signIn();
 
-      const idToken = response?.data?.idToken;
+      console.log('[GoogleSignin] Response payload:', JSON.stringify(response));
+
+      // Support all @react-native-google-signin/google-signin response formats
+      const idToken = response?.data?.idToken || response?.idToken || (response?.type === 'success' ? response?.data?.idToken : null);
       if (!idToken) {
-        throw new Error('Failed to get Google ID token');
+        throw new Error('Failed to retrieve Google ID token from response.');
       }
 
       const result = await api.socialLogin({
