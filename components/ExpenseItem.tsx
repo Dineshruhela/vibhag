@@ -88,7 +88,7 @@ export function ExpenseItem({ expense, currentUserId, myShare = 0, iPaid = 0, on
           </>
         )}
         {isZero && (
-          <Text style={[styles.amountLabel, { color: colors.textTertiary, fontFamily: FontFamily.regular }]}>
+          <Text style={[styles.amountLabel, { color: colors.textSecondary, fontFamily: FontFamily.medium }]}>
             settled
           </Text>
         )}

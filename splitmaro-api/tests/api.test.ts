@@ -328,35 +328,17 @@ describe('Splitmaro API Integration Tests', () => {
       expect(configRes.body.currency).toBeDefined();
     });
 
-    test('should verify Sandbox payment and record purchase history logs', async () => {
-      // Fetch dynamic configurations
-      const configRes = await request(API_URL).get('/api/payment/config');
-      const expectedAmount = configRes.body.amount;
-      const expectedCurrency = configRes.body.currency;
-
+    test('should reject unverified payment attempts without valid Razorpay keys/signature', async () => {
       const paymentRes = await request(API_URL)
         .post('/api/verify-payment')
         .set('Authorization', `Bearer ${buyerToken}`)
         .send({
-          razorpay_payment_id: 'pay_mock_' + Math.random().toString(36).substring(2, 10),
-          razorpay_order_id: 'order_mock_' + Math.random().toString(36).substring(2, 10),
-          razorpay_signature: 'sandbox-sig'
+          razorpay_payment_id: 'pay_unverified_' + Math.random().toString(36).substring(2, 10),
+          razorpay_order_id: 'order_unverified_' + Math.random().toString(36).substring(2, 10),
+          razorpay_signature: 'invalid-sig'
         });
 
-      expect(paymentRes.status).toBe(200);
-      expect(paymentRes.body.success).toBe(true);
-
-      // Verify purchase was recorded
-      const historyRes = await request(API_URL)
-        .get('/api/payment/history')
-        .set('Authorization', `Bearer ${buyerToken}`);
-
-      expect(historyRes.status).toBe(200);
-      expect(historyRes.body.length).toBe(1);
-      expect(historyRes.body[0].provider).toBe('sandbox');
-      expect(historyRes.body[0].amount).toBe(expectedAmount);
-      expect(historyRes.body[0].currency).toBe(expectedCurrency);
-      expect(historyRes.body[0].status).toBe('success');
+      expect([400, 503]).toContain(paymentRes.status);
     });
   });
 

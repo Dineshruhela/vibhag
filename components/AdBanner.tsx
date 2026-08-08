@@ -1,49 +1,35 @@
-import React, { useEffect, useState } from 'react';
-import { View, Platform, DeviceEventEmitter } from 'react-native';
-import { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
-import { getCurrentUser } from '../lib/database';
-
-// Replace with real Ad Unit IDs before production.
-const adUnitId = __DEV__ 
-  ? TestIds.BANNER 
-  : (Platform.OS === 'ios' ? 'ca-app-pub-3940256099942544~1458002511' : 'ca-app-pub-3940256099942544~3347511713');
+import React, { useState } from 'react';
+import { View, Platform } from 'react-native';
+import { AD_UNIT_IDS } from '../constants/AdConfig';
 
 export function AdBanner() {
-  const [isPro, setIsPro] = useState<boolean | null>(null);
-
-  const checkProStatus = async () => {
-    try {
-      const user = await getCurrentUser();
-      setIsPro(!!user?.is_pro);
-    } catch (e) {
-      setIsPro(false);
-    }
-  };
-
-  useEffect(() => {
-    checkProStatus();
-    
-    // Re-check if auth state changes (e.g. after a purchase)
-    const authSub = DeviceEventEmitter.addListener('auth_change', checkProStatus);
-    const purchaseSub = DeviceEventEmitter.addListener('pro_upgrade_success', checkProStatus);
-    return () => {
-      authSub.remove();
-      purchaseSub.remove();
-    };
-  }, []);
-
-  // If loading or if the user is a pro, don't show the ad
-  if (isPro === null || isPro === true) {
+  if (Platform.OS === 'web') {
     return null;
   }
 
+  const GoogleMobileAds = require('react-native-google-mobile-ads');
+  const BannerAd = GoogleMobileAds.BannerAd;
+  const BannerAdSize = GoogleMobileAds.BannerAdSize;
+  const TestIds = GoogleMobileAds.TestIds;
+
+  const [currentUnitId, setCurrentUnitId] = useState<string>(AD_UNIT_IDS.banner);
+
+  if (!BannerAd) return null;
+
   return (
-    <View style={{ alignItems: 'center', justifyContent: 'center', width: '100%', marginVertical: 8 }}>
+    <View style={{ alignItems: 'center', justifyContent: 'center', width: '100%', marginVertical: 8, minHeight: 50 }}>
       <BannerAd
-        unitId={adUnitId}
+        unitId={currentUnitId}
         size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
         requestOptions={{
           requestNonPersonalizedAdsOnly: true,
+        }}
+        onAdFailedToLoad={(error: any) => {
+          console.warn('[AdBanner] Failed to load ad unit:', currentUnitId, error);
+          if (currentUnitId !== TestIds.BANNER) {
+            console.log('[AdBanner] Falling back to Google Test Banner ID for TestFlight...');
+            setCurrentUnitId(TestIds.BANNER);
+          }
         }}
       />
     </View>

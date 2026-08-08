@@ -3,6 +3,7 @@
  */
 import { Avatar } from '@/components/Avatar';
 import { Card } from '@/components/Card';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { AvatarColors } from '@/constants/Colors';
 import { BorderRadius, Spacing } from '@/constants/Spacing';
 import { useSync } from '@/hooks/useSync';
@@ -173,9 +174,12 @@ export default function ProfileScreen() {
             <Avatar name={user.name} color={user.avatar_color} size={80} fontSize={32} avatarUrl={user.avatar_url} />
             <Text style={[styles.title, { color: colors.text }]}>Your Profile</Text>
           </View>
-          <Pressable onPress={handleRefresh} style={{ padding: 8, borderRadius: 20, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, marginLeft: 12 }}>
-            <Ionicons name="refresh" size={22} color={colors.primary} />
-          </Pressable>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <ThemeToggle />
+            <Pressable onPress={handleRefresh} style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="refresh" size={20} color={colors.primary} />
+            </Pressable>
+          </View>
         </Animated.View>
 
         <Animated.View entering={FadeInDown.delay(200).springify()}>
@@ -213,32 +217,16 @@ export default function ProfileScreen() {
         </Animated.View>
 
         <Animated.View entering={FadeInDown.delay(250).springify()}>
-          <Text style={[styles.label, { color: colors.textSecondary, marginTop: Spacing.xl }]}>SUBSCRIPTION</Text>
+          <Text style={[styles.label, { color: colors.textSecondary, marginTop: Spacing.xl }]}>PLAN</Text>
           <Card variant="default" padding={0} style={{ overflow: 'hidden' }}>
-            <View style={[styles.proRow, { backgroundColor: isPro ? colors.primary + '10' : colors.surface }]}>
-              <View style={[styles.proIcon, { backgroundColor: isPro ? colors.primary : colors.textTertiary }]}>
-                <Ionicons name="diamond-outline" size={20} color="#FFF" />
+            <View style={[styles.proRow, { backgroundColor: colors.surface }]}>
+              <View style={[styles.proIcon, { backgroundColor: colors.textTertiary }]}>
+                <Ionicons name="phone-portrait-outline" size={20} color="#FFF" />
               </View>
               <View style={styles.infoTextContainer}>
-                <Text style={[styles.infoTitle, { color: colors.text }]}>
-                  {isPro ? 'Splitmaro Pro' : 'Free Version'}
-                </Text>
-                <Text style={[styles.infoSub, { color: colors.textTertiary }]}>
-                  {isPro ? 'Unlimited groups & premium features' : 'Limit: 3 active groups'}
-                </Text>
+                <Text style={[styles.infoTitle, { color: colors.text }]}>Free — Ad Supported</Text>
+                <Text style={[styles.infoSub, { color: colors.textTertiary }]}>Unlimited groups &amp; features</Text>
               </View>
-              {!isPro ? (
-                <Pressable
-                  onPress={() => router.push('/pro/upgrade')}
-                  style={[styles.upgradeBadge, { backgroundColor: colors.primary }]}
-                >
-                  <Text style={styles.upgradeBadgeText}>Upgrade</Text>
-                </Pressable>
-              ) : (
-                <View style={[styles.proBadge, { borderColor: colors.primary }]}>
-                  <Text style={{ color: colors.primary, fontSize: 11, fontWeight: '700' }}>ACTIVE</Text>
-                </View>
-              )}
             </View>
           </Card>
         </Animated.View>
@@ -424,7 +412,40 @@ export default function ProfileScreen() {
                 <Text style={[styles.infoTitle, { color: colors.text }]}>Contact Support</Text>
                 <Text style={[styles.infoSub, { color: colors.textTertiary }]}>support@splitmaro.com</Text>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+            </Pressable>
+          </Card>
+        </Animated.View>
+
+        {/* Account Actions */}
+        <Animated.View entering={FadeInDown.delay(520).springify()}>
+          <Text style={[styles.label, { color: colors.textSecondary, marginTop: Spacing.xl }]}>ACCOUNT ACTIONS</Text>
+          <Card variant="default" padding={0} style={{ overflow: 'hidden' }}>
+            <Pressable
+              onPress={handleSignOut}
+              style={[styles.infoRow, { borderBottomWidth: 1, borderBottomColor: colors.borderLight }]}
+            >
+              <View style={[styles.notifIcon, { backgroundColor: '#FF3B3015' }]}>
+                <Ionicons name="log-out-outline" size={20} color="#FF3B30" />
+              </View>
+              <View style={styles.infoTextContainer}>
+                <Text style={[styles.infoTitle, { color: '#FF3B30' }]}>Log Out</Text>
+                <Text style={[styles.infoSub, { color: colors.textTertiary }]}>Sign out of your account on this device</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#FF3B30" />
+            </Pressable>
+            
+            <Pressable
+              onPress={handleDeactivateAccount}
+              style={styles.infoRow}
+            >
+              <View style={[styles.notifIcon, { backgroundColor: '#FF444415' }]}>
+                <Ionicons name="trash-outline" size={20} color="#FF4444" />
+              </View>
+              <View style={styles.infoTextContainer}>
+                <Text style={[styles.infoTitle, { color: '#FF4444' }]}>Deactivate Account</Text>
+                <Text style={[styles.infoSub, { color: colors.textTertiary }]}>Permanently remove profile from active groups</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#FF4444" />
             </Pressable>
           </Card>
         </Animated.View>
@@ -432,12 +453,6 @@ export default function ProfileScreen() {
         <View style={{ alignItems: 'center', marginTop: Spacing.xl, marginBottom: Spacing.md }}>
           <Text style={{ color: colors.textTertiary, fontSize: 12 }}>Made with ❤️ by Dinesh Ruhela</Text>
         </View>
-
-        <View style={{ height: 20 }} />
-        
-        <Pressable onPress={handleDeactivateAccount} style={styles.deleteBtn}>
-          <Text style={styles.deleteBtnText}>Deactivate Account</Text>
-        </Pressable>
 
         <View style={{ height: 40 }} />
       </ScrollView>

@@ -20,7 +20,7 @@ export function BalanceIndicator({ amount, showLabel = true, size = 'md', curren
   const isPositive = amount > 0;
   const isZero = Math.abs(amount) < 0.01;
   
-  const color = isZero ? colors.textTertiary : isPositive ? colors.primary : colors.negative;
+  const color = isZero ? colors.textSecondary : isPositive ? colors.primary : colors.negative;
   const label = isZero ? 'settled up' : isPositive ? 'you are owed' : 'you owe';
   
   const fontSizes = { sm: 14, md: 18, lg: 28 };

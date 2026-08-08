@@ -2962,6 +2962,41 @@ app.get('/api/admin/stats', authenticateToken as any, async (req: AuthRequest, r
   }
 });
 
+app.post('/api/admin/users/reset-pro', authenticateToken as any, async (req: AuthRequest, res) => {
+  try {
+    const adminUser = await prisma.user.findUnique({ where: { id: req.user.userId } });
+    if (!adminUser || adminUser.is_admin !== 1) {
+      return res.status(403).json({ error: 'Access denied: Admin privileges required' });
+    }
+
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email parameter is required' });
+
+    const user = await prisma.user.findFirst({
+      where: { email: { equals: String(email).trim(), mode: 'insensitive' } }
+    });
+
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { is_pro: 0, updated_at: BigInt(Date.now()) }
+    });
+
+    const deleted = await prisma.purchase.deleteMany({
+      where: { user_id: user.id }
+    });
+
+    res.json({
+      success: true,
+      message: `Pro subscription for ${user.email} reset successfully. Cleared ${deleted.count} purchase logs.`
+    });
+  } catch (error) {
+    console.error('[Admin Reset Pro Error]:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
 app.post('/api/create-order', authenticateToken as any, async (req: AuthRequest, res) => {
   try {
     const { amount, currency, receipt } = req.body;
@@ -2973,15 +3008,7 @@ app.post('/api/create-order', authenticateToken as any, async (req: AuthRequest,
     const keySecret = process.env.RAZORPAY_KEY_SECRET;
 
     if (!keyId || !keySecret) {
-      if (process.env.NODE_ENV === 'production') {
-        return res.status(503).json({ error: 'Payment provider is not configured' });
-      }
-      console.log('[Create Order] Razorpay keys not configured. Returning mock order.');
-      return res.json({
-        order_id: 'order_mock_' + Math.random().toString(36).substring(2, 10),
-        amount: Number(amount),
-        currency: currency || 'INR'
-      });
+      return res.status(503).json({ error: 'Payment provider is not configured' });
     }
 
     const razorpay = new Razorpay({
@@ -3020,24 +3047,18 @@ app.post('/api/verify-payment', authenticateToken as any, async (req: AuthReques
     }
 
     const keySecret = process.env.RAZORPAY_KEY_SECRET;
-    const isSandbox = process.env.NODE_ENV !== 'production' && (!process.env.RAZORPAY_KEY_ID || !keySecret || razorpay_signature === 'sandbox-sig');
-
-    if (process.env.NODE_ENV === 'production' && (!process.env.RAZORPAY_KEY_ID || !keySecret)) {
+    if (!keySecret) {
       return res.status(503).json({ error: 'Payment provider is not configured' });
     }
 
-    if (!isSandbox) {
-      const payload = `${razorpay_order_id}|${razorpay_payment_id}`;
-      const expectedSignature = crypto
-        .createHmac('sha256', keySecret!)
-        .update(payload)
-        .digest('hex');
+    const payload = `${razorpay_order_id}|${razorpay_payment_id}`;
+    const expectedSignature = crypto
+      .createHmac('sha256', keySecret)
+      .update(payload)
+      .digest('hex');
 
-      if (expectedSignature !== razorpay_signature) {
-        return res.status(400).json({ error: 'Signature mismatch. Verification failed.' });
-      }
-    } else {
-      console.log('[Verify Payment] Sandbox mode active. Skipping real signature check.');
+    if (expectedSignature !== razorpay_signature) {
+      return res.status(400).json({ error: 'Signature mismatch. Verification failed.' });
     }
 
     const userId = req.user.userId;
@@ -3050,20 +3071,18 @@ app.post('/api/verify-payment', authenticateToken as any, async (req: AuthReques
     let purchaseAmount = config.amount;
     let purchaseCurrency = config.currency;
 
-    if (!isSandbox) {
-      try {
-        const razorpay = new Razorpay({
-          key_id: process.env.RAZORPAY_KEY_ID!,
-          key_secret: keySecret!,
-        });
-        const order = await razorpay.orders.fetch(razorpay_order_id);
-        if (order) {
-          purchaseAmount = Number(order.amount) / 100;
-          purchaseCurrency = order.currency;
+    try {
+      const keyId = process.env.RAZORPAY_KEY_ID;
+      if (keyId && keySecret) {
+        const razorpay = new Razorpay({ key_id: keyId, key_secret: keySecret });
+        const fetchedPayment = await razorpay.payments.fetch(razorpay_payment_id);
+        if (fetchedPayment && fetchedPayment.amount) {
+          purchaseAmount = Number(fetchedPayment.amount) / 100;
+          purchaseCurrency = String(fetchedPayment.currency || config.currency);
         }
-      } catch (rzpErr) {
-        console.warn('[Verify Payment] Failed to fetch real Razorpay order details:', rzpErr);
       }
+    } catch (fetchErr) {
+      console.warn('[Verify Payment] Could not fetch payment details from Razorpay, using config amount:', fetchErr);
     }
 
     try {
@@ -3074,7 +3093,7 @@ app.post('/api/verify-payment', authenticateToken as any, async (req: AuthReques
           amount: purchaseAmount,
           currency: purchaseCurrency,
           status: 'success',
-          provider: isSandbox ? 'sandbox' : 'razorpay',
+          provider: 'razorpay',
           razorpay_payment_id: razorpay_payment_id,
           razorpay_order_id: razorpay_order_id,
           created_at: BigInt(Date.now()),
@@ -3106,8 +3125,10 @@ app.post('/api/payment/revenuecat-sync', authenticateToken as any, async (req: A
   try {
     const userId = req.user.userId;
     const revenueCatApiKey = process.env.REVENUECAT_SECRET_API_KEY;
+    const { amount = 499, currency = 'INR' } = req.body || {};
+
     if (!revenueCatApiKey) {
-      return res.status(503).json({ error: 'RevenueCat verification is not configured' });
+      return res.status(503).json({ error: 'RevenueCat verification is not configured on the server. Valid payment is required to activate Pro.' });
     }
 
     const subscriber = await axios.get(
@@ -3176,6 +3197,68 @@ app.post('/api/payment/revenuecat-sync', authenticateToken as any, async (req: A
   } catch (error) {
     console.error('RevenueCat Sync Error:', error);
     res.status(500).json({ error: String(error) });
+  }
+});
+
+// RevenueCat Production Webhook Endpoint
+app.post('/api/webhooks/revenuecat', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const webhookSecret = process.env.REVENUECAT_WEBHOOK_SECRET;
+
+    if (webhookSecret && authHeader !== `Bearer ${webhookSecret}`) {
+      console.warn('[RevenueCat Webhook] Unauthorized webhook event blocked.');
+      return res.status(401).json({ error: 'Unauthorized webhook' });
+    }
+
+    const event = req.body?.event;
+    if (!event) {
+      return res.status(400).json({ error: 'Invalid event payload' });
+    }
+
+    const eventType = event.type;
+    const appUserId = event.app_user_id;
+
+    console.log(`[RevenueCat Webhook] Event "${eventType}" received for user:`, appUserId);
+
+    if (!appUserId) {
+      return res.json({ received: true });
+    }
+
+    const activateEvents = ['INITIAL_PURCHASE', 'NON_RENEWING_PURCHASE', 'RENEWAL', 'PRODUCT_CHANGE'];
+    const deactivateEvents = ['CANCELLATION', 'EXPIRATION', 'REVOCATION'];
+
+    if (activateEvents.includes(eventType)) {
+      await prisma.user.update({
+        where: { id: appUserId },
+        data: { is_pro: 1, updated_at: BigInt(Date.now()) }
+      }).catch(err => console.warn('[RevenueCat Webhook] User update notice:', err.message));
+
+      await prisma.purchase.create({
+        data: {
+          user_id: appUserId,
+          amount: Number(event.price_in_purchased_currency) || 499,
+          currency: String(event.currency || 'INR'),
+          status: 'success',
+          provider: 'revenuecat_webhook',
+          created_at: BigInt(Date.now())
+        }
+      }).catch(err => console.warn('[RevenueCat Webhook] Purchase log notice:', err.message));
+
+      console.log(`[RevenueCat Webhook] User ${appUserId} upgraded to Pro via webhook.`);
+    } else if (deactivateEvents.includes(eventType)) {
+      await prisma.user.update({
+        where: { id: appUserId },
+        data: { is_pro: 0, updated_at: BigInt(Date.now()) }
+      }).catch(err => console.warn('[RevenueCat Webhook] User downgrade notice:', err.message));
+
+      console.log(`[RevenueCat Webhook] User ${appUserId} Pro status revoked via webhook.`);
+    }
+
+    return res.json({ received: true, eventType });
+  } catch (error) {
+    console.error('[RevenueCat Webhook Error]:', error);
+    return res.status(500).json({ error: String(error) });
   }
 });
 
@@ -3554,16 +3637,6 @@ const checkoutHtmlTemplate = `<!DOCTYPE html>
         }
         
         const order = await orderRes.json();
-        
-        if (order.order_id.startsWith('order_mock_')) {
-          setStatus('Simulating sandbox payment...', 'info');
-          await verifyPayment({
-            razorpay_payment_id: 'pay_mock_' + Math.random().toString(36).substring(2, 10),
-            razorpay_order_id: order.order_id,
-            razorpay_signature: 'sandbox-sig'
-          });
-          return;
-        }
         
         const options = {
           key: keyId,

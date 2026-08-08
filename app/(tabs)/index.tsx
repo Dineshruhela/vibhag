@@ -5,6 +5,7 @@ import { Avatar } from '@/components/Avatar';
 import { Card } from '@/components/Card';
 import { EmptyState } from '@/components/EmptyState';
 import { Skeleton } from '@/components/Skeleton';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { BorderRadius, Spacing } from '@/constants/Spacing';
 import { useThemeColors } from '@/hooks/useThemeColor';
 import { formatCurrency } from '@/lib/format';
@@ -111,18 +112,21 @@ export default function DashboardScreen() {
             {currentUser?.name === 'You' ? 'Splitmaro' : currentUser?.name || 'Splitmaro'}
           </Text>
         </View>
-        <Pressable
-          onPress={() => router.push('/profile' as any)}
-          style={[styles.profileBtn, { backgroundColor: colors.surface }]}
-        >
-          <Avatar
-            name={currentUser?.name || 'Y'}
-            color={currentUser?.avatar_color || colors.primary}
-            size={38}
-            fontSize={14}
-            avatarUrl={currentUser?.avatar_url}
-          />
-        </Pressable>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <ThemeToggle />
+          <Pressable
+            onPress={() => router.push('/profile' as any)}
+            style={[styles.profileBtn, { backgroundColor: colors.surface }]}
+          >
+            <Avatar
+              name={currentUser?.name || 'Y'}
+              color={currentUser?.avatar_color || colors.primary}
+              size={38}
+              fontSize={14}
+              avatarUrl={currentUser?.avatar_url}
+            />
+          </Pressable>
+        </View>
       </View>
 
       <ScrollView
@@ -160,20 +164,10 @@ export default function DashboardScreen() {
             end={{ x: 1, y: 1 }}
             style={styles.balanceCard}
           >
-            <Text
-              style={[
-                styles.balanceTitle,
-                { color: netBalance === 0 ? colors.textSecondary : 'rgba(255,255,255,0.85)' },
-              ]}
-            >
-              Overall Balance
+            <Text style={[styles.balanceTitle, { color: 'rgba(255, 255, 255, 0.75)' }]}>
+              OVERALL BALANCE
             </Text>
-            <Text
-              style={[
-                styles.balanceAmount,
-                { color: netBalance === 0 ? colors.textTertiary : '#FFFFFF' },
-              ]}
-            >
+            <Text style={[styles.balanceAmount, { color: '#FFFFFF', fontWeight: '800' }]}>
               {netBalance === 0
                 ? 'All settled up! 🎉'
                 : `${netBalance > 0 ? '+' : ''}${formatCurrency(netBalance)}`}
@@ -188,54 +182,28 @@ export default function DashboardScreen() {
               style={[
                 styles.balanceRow,
                 {
-                  borderTopColor:
-                    netBalance === 0 ? colors.border : 'rgba(255,255,255,0.2)',
+                  borderTopColor: 'rgba(255, 255, 255, 0.2)',
                   borderTopWidth: 1,
                   marginTop: 16,
                 },
               ]}
             >
               <View style={styles.balanceItem}>
-                <View style={[styles.balanceDot, { backgroundColor: netBalance === 0 ? colors.primary : 'rgba(255,255,255,0.6)' }]} />
-                <Text
-                  style={[
-                    styles.balanceItemLabel,
-                    { color: netBalance === 0 ? colors.textSecondary : 'rgba(255,255,255,0.75)' },
-                  ]}
-                >
+                <View style={[styles.balanceDot, { backgroundColor: totalOwed > 0 ? '#A7F3D0' : 'rgba(255,255,255,0.7)' }]} />
+                <Text style={[styles.balanceItemLabel, { color: 'rgba(255, 255, 255, 0.85)' }]}>
                   You are owed
                 </Text>
-                <Text
-                  style={[
-                    styles.balanceItemAmount,
-                    { color: '#00D4B8' },
-                  ]}
-                >
+                <Text style={[styles.balanceItemAmount, { color: '#FFFFFF', fontWeight: '800' }]}>
                   {formatCurrency(totalOwed)}
                 </Text>
               </View>
-              <View
-                style={[
-                  styles.divider,
-                  { backgroundColor: netBalance === 0 ? colors.border : 'rgba(255,255,255,0.2)' },
-                ]}
-              />
+              <View style={[styles.divider, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]} />
               <View style={styles.balanceItem}>
-                <View style={[styles.balanceDot, { backgroundColor: netBalance === 0 ? colors.negative : 'rgba(255,255,255,0.6)' }]} />
-                <Text
-                  style={[
-                    styles.balanceItemLabel,
-                    { color: netBalance === 0 ? colors.textSecondary : 'rgba(255,255,255,0.75)' },
-                  ]}
-                >
+                <View style={[styles.balanceDot, { backgroundColor: totalOwe > 0 ? '#FECDD3' : 'rgba(255,255,255,0.7)' }]} />
+                <Text style={[styles.balanceItemLabel, { color: 'rgba(255, 255, 255, 0.85)' }]}>
                   You owe
                 </Text>
-                <Text
-                  style={[
-                    styles.balanceItemAmount,
-                    { color: '#FF6B6B' },
-                  ]}
-                >
+                <Text style={[styles.balanceItemAmount, { color: '#FFFFFF', fontWeight: '800' }]}>
                   {formatCurrency(totalOwe)}
                 </Text>
               </View>

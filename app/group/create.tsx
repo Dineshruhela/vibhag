@@ -10,7 +10,7 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { createGroup, getAllFriends, getCurrentUser, getGroupsCount, type User } from '../../lib/database';
+import { createGroup, getAllFriends, type User } from '../../lib/database';
 
 const categories = Object.entries(GroupCategoryColors);
 
@@ -37,21 +37,6 @@ export default function CreateGroupScreen() {
     if (!name.trim()) { Alert.alert('Error', 'Please enter a group name.'); return; }
     setSaving(true);
     try {
-      const [count, user] = await Promise.all([getGroupsCount(), getCurrentUser()]);
-      
-      if (count >= 3 && !user.is_pro) {
-        setSaving(false);
-        Alert.alert(
-          'Limit Reached',
-          'Free users can create up to 3 groups. Upgrade to Splitmaro Pro for unlimited groups!',
-          [
-            { text: 'Later', style: 'cancel' },
-            { text: 'View Pro Features', onPress: () => router.push('/pro/upgrade') }
-          ]
-        );
-        return;
-      }
-
       await createGroup(name.trim(), category, Array.from(selected));
       // Push immediately so other members see the group without waiting for AppState foreground
       require('@/lib/sync').pushToCloud().catch((e: any) => console.warn('[CreateGroup] Push failed:', e));

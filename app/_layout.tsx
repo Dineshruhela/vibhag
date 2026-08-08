@@ -6,6 +6,8 @@ import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useSync } from '@/hooks/useSync';
+import { useAppOpenAd } from '@/hooks/useAppOpenAd';
+import { ThemeProviderCustom, useThemeContext } from '@/context/ThemeContext';
 import {
   Inter_400Regular,
   Inter_500Medium,
@@ -65,7 +67,15 @@ const SplitmaroLightTheme = {
 };
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  return (
+    <ThemeProviderCustom>
+      <RootLayoutInner />
+    </ThemeProviderCustom>
+  );
+}
+
+function RootLayoutInner() {
+  const { colorScheme } = useThemeContext();
   const [loaded] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
@@ -81,49 +91,23 @@ export default function RootLayout() {
   const router = useRouter();
   useNotifications();
   useSync();
+  useAppOpenAd();
 
-  // Configure RevenueCat Purchases once the user profile is loaded
+  // Initialize Google Mobile Ads SDK on app startup
   useEffect(() => {
-    if (Platform.OS === 'ios') {
-      (async () => {
-        try {
-          const { getCurrentUser } = require('../lib/database');
-          const Purchases = require('react-native-purchases').default;
-          const user = await getCurrentUser().catch(() => null);
-          if (user && user.id) {
-            console.log('[Purchases] Initializing RevenueCat for user:', user.id);
-            Purchases.configure({
-              apiKey: process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY || 'your_revenuecat_api_key',
-              appUserID: user.id
-            });
-          }
-        } catch (e) {
-          console.warn('[Purchases] Failed to initialize RevenueCat:', e);
-        }
-      })();
+    try {
+      const mobileAds = require('react-native-google-mobile-ads').default;
+      mobileAds()
+        .initialize()
+        .then((adapterStatuses: any) => {
+          console.log('[MobileAds] Google Mobile Ads initialized:', adapterStatuses);
+        })
+        .catch((err: any) => {
+          console.warn('[MobileAds] Google Mobile Ads init warning:', err);
+        });
+    } catch (e) {
+      console.warn('[MobileAds] Failed to load Google Mobile Ads module:', e);
     }
-  }, []);
-
-  useEffect(() => {
-    const sub = DeviceEventEmitter.addListener('auth_change', async () => {
-      if (Platform.OS === 'ios') {
-        try {
-          const { getCurrentUser } = require('../lib/database');
-          const Purchases = require('react-native-purchases').default;
-          const user = await getCurrentUser().catch(() => null);
-          if (user && user.id) {
-            console.log('[Purchases] Re-configuring RevenueCat for user:', user.id);
-            Purchases.configure({
-              apiKey: process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY || 'your_revenuecat_api_key',
-              appUserID: user.id
-            });
-          }
-        } catch (e) {
-          console.warn('[Purchases] Failed to re-configure RevenueCat:', e);
-        }
-      }
-    });
-    return () => sub.remove();
   }, []);
 
   // Handle deep links (e.g. splitmaro://join/GROUP_ID)
@@ -132,8 +116,8 @@ export default function RootLayout() {
       console.log('[DeepLink] Received URL:', event.url);
       const parsed = Linking.parse(event.url);
       
-      // Check for splitmaro://pro-success (Android only, iOS has no Pro upgrade)
-      if (Platform.OS !== 'ios' && (parsed.hostname === 'pro-success' || event.url.includes('pro-success'))) {
+      // Check for splitmaro://pro-success — handle on ALL platforms (iOS + Android)
+      if (parsed.hostname === 'pro-success' || event.url.includes('pro-success')) {
         console.log('[DeepLink] Pro upgrade success detected, dismissing browser and emitting success...');
         WebBrowser.dismissBrowser();
         DeviceEventEmitter.emit('pro_upgrade_success');
@@ -180,7 +164,7 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ToastProvider>
-      <ThemeProvider value={SplitmaroDarkTheme}>
+      <ThemeProvider value={colorScheme === 'dark' ? SplitmaroDarkTheme : SplitmaroLightTheme}>
         <GlobalProgressBar />
         <Stack
         screenOptions={{
@@ -290,14 +274,7 @@ export default function RootLayout() {
             animation: 'slide_from_right',
           }}
         />
-        <Stack.Screen
-          name="pro/upgrade"
-          options={{
-            presentation: 'modal',
-            headerShown: false,
-            animation: 'slide_from_bottom',
-          }}
-        />
+
         <Stack.Screen
           name="admin/dashboard"
           options={{
@@ -307,7 +284,7 @@ export default function RootLayout() {
         />
         <Stack.Screen name="+not-found" />
       </Stack>
-      <StatusBar style="light" />
+      <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
     </ThemeProvider>
     </ToastProvider>
     </GestureHandlerRootView>

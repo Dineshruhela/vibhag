@@ -371,7 +371,7 @@ export default function GroupDetailScreen() {
                     <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>{b.userName}</Text>
                     {b.userEmail && <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 2 }}>{b.userEmail}</Text>}
                   </View>
-                  <Text style={[styles.balAmt, { color: Math.abs(b.amount) < 0.01 ? colors.textTertiary : b.amount > 0 ? colors.primary : colors.negative }]}>
+                  <Text style={[styles.balAmt, { color: Math.abs(b.amount) < 0.01 ? colors.textSecondary : b.amount > 0 ? colors.primary : colors.negative }]}>
                     {Math.abs(b.amount) < 0.01 ? 'settled' : `${b.amount > 0 ? '+' : '-'}${formatCurrency(Math.abs(b.amount), groupCurrency)}`}
                   </Text>
                 </View>
