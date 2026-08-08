@@ -30,7 +30,7 @@
       },
       "edgeToEdgeEnabled": true,
       "package": "com.dineshruhela.vibhag",
-      "versionCode": 33
+      "versionCode": 34
     },
     "web": {
       "bundler": "metro",
