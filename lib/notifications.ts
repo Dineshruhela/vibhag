@@ -6,11 +6,9 @@ import Constants from 'expo-constants';
 import type * as NotificationsType from 'expo-notifications';
 import { Platform } from 'react-native';
 
-const isExpoGo = Constants.appOwnership === 'expo';
-
-// Dynamic lazy import of expo-notifications to bypass Expo Go SDK 53+ warnings
+// Dynamic import of expo-notifications for native platforms
 let Notifications: any = null;
-if (Platform.OS !== 'web' && !isExpoGo) {
+if (Platform.OS !== 'web') {
   try {
     Notifications = require('expo-notifications');
   } catch (e) {
