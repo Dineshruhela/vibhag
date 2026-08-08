@@ -151,7 +151,11 @@ export default function LoginScreen() {
         Alert.alert('Error', 'Google Play Services are not available on this device.');
       } else {
         console.error('Google Sign-In Error:', error);
-        Alert.alert('Google Sign-In Failed', error.message || 'Could not sign in with Google.');
+        let detailMsg = error.message || 'Could not sign in with Google.';
+        if (error.code) {
+          detailMsg += ` (Code: ${error.code})`;
+        }
+        Alert.alert('Google Sign-In Failed', detailMsg);
       }
     } finally {
       setLoading(false);

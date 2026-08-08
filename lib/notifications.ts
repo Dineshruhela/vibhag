@@ -27,8 +27,17 @@ if (Notifications) {
         shouldSetBadge: true,
       }),
     });
+
+    if (Platform.OS === 'android') {
+      Notifications.setNotificationChannelAsync('default', {
+        name: 'Default Notifications',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#1CC29F',
+      });
+    }
   } catch (e) {
-    console.warn('[Notifications] Failed to set notification handler:', e);
+    console.warn('[Notifications] Failed to set notification handler/channel:', e);
   }
 }
 

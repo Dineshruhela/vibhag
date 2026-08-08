@@ -186,6 +186,8 @@ async function sendPushNotification(userId: string, title: string, body: string,
       body,
       data,
       sound: 'default',
+      channelId: 'default',
+      priority: 'high',
     });
 
     // Expo returns DeviceNotRegistered when a user uninstalls the app or the
