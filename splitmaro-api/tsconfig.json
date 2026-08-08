@@ -8,8 +8,10 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "moduleResolution": "node",
+    "outDir": "./dist",
     "ignoreDeprecations": "6.0",
     "types": ["jest", "node"]
   },
-  "include": ["index.ts", "tests/**/*.ts"]
+  "include": ["index.ts"],
+  "exclude": ["tests/**/*.ts"]
 }
