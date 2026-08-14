@@ -4,6 +4,7 @@
 import { ToastProvider } from '@/components/Toast';
 import { AlertProvider } from '@/components/CustomAlert';
 import { Colors } from '@/constants/Colors';
+import { requestAllAppPermissions } from '@/lib/permissions';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useSync } from '@/hooks/useSync';
@@ -155,6 +156,9 @@ function RootLayoutInner() {
       SplashScreen.hideAsync().catch(() => {
         /* silencing error/warning when splash screen is not registered or already hidden */
       });
+      requestAllAppPermissions().catch(err => {
+        console.warn('[Permissions] Failed to request permissions:', err);
+      });
     }
   }, [loaded]);
 
@@ -167,7 +171,6 @@ function RootLayoutInner() {
       <ToastProvider>
         <AlertProvider>
           <ThemeProvider value={colorScheme === 'dark' ? SplitmaroDarkTheme : SplitmaroLightTheme}>
-            <GlobalProgressBar />
             <Stack
               screenOptions={{
                 headerShown: false,
