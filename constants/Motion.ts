@@ -1,69 +1,70 @@
 /**
- * Splitmaro Motion System
- * Shared animation presets using react-native-reanimated
+ * Splitmaro Motion System — Pro Level
+ * High performance spring & timing configurations inspired by Apple iOS & Linear
  */
 import {
-    Easing,
-    FadeIn,
-    FadeInDown,
-    FadeInUp,
-    FadeOut,
-    FadeOutDown,
-    FadeOutUp,
-    LinearTransition,
-    SlideInRight,
-    SlideOutLeft,
-    withSpring,
-    withTiming,
-    ZoomIn,
-    ZoomOut,
+  Easing,
+  FadeIn,
+  FadeInDown,
+  FadeInUp,
+  FadeOut,
+  FadeOutDown,
+  FadeOutUp,
+  LinearTransition,
+  SlideInRight,
+  SlideOutLeft,
+  withSpring,
+  withTiming,
+  ZoomIn,
+  ZoomOut,
 } from 'react-native-reanimated';
 
-// ─── Spring configs ──────────────────────────────────────────────
+// ─── Pro Spring Configs ──────────────────────────────────────────
 export const Spring = {
-  /** Quick, snappy response — for button presses, toggles */
-  snappy: { damping: 18, stiffness: 350, mass: 0.8 },
-  /** Standard feel — for list items, cards */
-  standard: { damping: 22, stiffness: 280, mass: 1 },
-  /** Bouncy — for FAB, modals entering */
-  bouncy: { damping: 14, stiffness: 220, mass: 1 },
-  /** Gentle — for tab transitions, large layout shifts */
-  gentle: { damping: 28, stiffness: 180, mass: 1 },
+  /** Ultra-responsive feedback — for buttons, chips, micro-interactions */
+  snappy: { damping: 20, stiffness: 420, mass: 0.6 },
+  /** Silky fluid feel — for cards, modals, sheets */
+  modal: { damping: 24, stiffness: 360, mass: 0.65 },
+  /** Standard natural feel — for lists and general UI elements */
+  standard: { damping: 24, stiffness: 320, mass: 0.8 },
+  /** Energetic pop — for badges, achievements, icons */
+  bouncy: { damping: 16, stiffness: 320, mass: 0.75 },
+  /** Gentle ease — for large container expansions */
+  gentle: { damping: 30, stiffness: 220, mass: 1 },
 };
 
-// ─── Timing configs ──────────────────────────────────────────────
+// ─── Pro Timing Configs ──────────────────────────────────────────
 export const Timing = {
-  instant: 80,
-  fast: 150,
-  normal: 250,
-  slow: 400,
-  verySlow: 600,
+  instant: 60,
+  fast: 140,
+  normal: 220,
+  medium: 300,
+  slow: 450,
 };
 
 export const Eases = {
   out: Easing.out(Easing.cubic),
-  in: Easing.in(Easing.cubic),
-  inOut: Easing.inOut(Easing.cubic),
-  spring: Easing.elastic(0.6),
+  outQuart: Easing.out(Easing.poly(4)),
+  inOut: Easing.bezier(0.25, 0.1, 0.25, 1),
 };
 
-// ─── Enter animations ────────────────────────────────────────────
+// ─── Pro Enter Animations ────────────────────────────────────────
 export const Enter = {
-  fade: FadeIn.duration(Timing.normal),
-  fadeUp: FadeInUp.duration(Timing.normal).springify().damping(22).stiffness(280),
-  fadeDown: FadeInDown.duration(Timing.normal).springify().damping(22).stiffness(280),
-  slideRight: SlideInRight.duration(Timing.normal).springify().damping(22),
-  zoom: ZoomIn.duration(Timing.normal).springify().damping(20),
-  /** Staggered list entry — use with index * delay */
+  fade: FadeIn.duration(Timing.fast),
+  fadeUp: FadeInUp.springify().damping(Spring.standard.damping).stiffness(Spring.standard.stiffness).mass(Spring.standard.mass),
+  fadeDown: FadeInDown.springify().damping(Spring.standard.damping).stiffness(Spring.standard.stiffness).mass(Spring.standard.mass),
+  slideRight: SlideInRight.springify().damping(Spring.modal.damping).stiffness(Spring.modal.stiffness),
+  zoom: ZoomIn.springify().damping(Spring.modal.damping).stiffness(Spring.modal.stiffness).mass(Spring.modal.mass),
+  /** Staggered list entry with optimized delay for rapid rendering */
   stagger: (index: number) =>
-    FadeInDown.delay(index * 40)
-      .duration(Timing.normal)
+    FadeInDown.delay(Math.min(index * 25, 250))
       .springify()
-      .damping(22)
-      .stiffness(280),
+      .damping(Spring.standard.damping)
+      .stiffness(Spring.standard.stiffness)
+      .mass(Spring.standard.mass),
 };
 
-// ─── Exit animations ─────────────────────────────────────────────
+// ─── Pro Exit Animations ─────────────────────────────────────────
 export const Exit = {
   fade: FadeOut.duration(Timing.fast),
   fadeUp: FadeOutUp.duration(Timing.fast),
@@ -72,15 +73,16 @@ export const Exit = {
   zoom: ZoomOut.duration(Timing.fast),
 };
 
-// ─── Layout transition ───────────────────────────────────────────
+// ─── Layout Transitions ──────────────────────────────────────────
 export const LayoutTransition = LinearTransition.springify()
   .damping(Spring.standard.damping)
-  .stiffness(Spring.standard.stiffness);
+  .stiffness(Spring.standard.stiffness)
+  .mass(Spring.standard.mass);
 
-// ─── Press scale helpers ─────────────────────────────────────────
-export const pressIn = (scale = 0.97) => withSpring(scale, Spring.snappy);
+// ─── Press Scale Helpers ─────────────────────────────────────────
+export const pressIn = (scale = 0.96) => withSpring(scale, Spring.snappy);
 export const pressOut = () => withSpring(1, Spring.snappy);
 
-// ─── Fade timing helper ──────────────────────────────────────────
+// ─── Fade Timing Helper ──────────────────────────────────────────
 export const fadeToValue = (value: number, duration = Timing.normal) =>
-  withTiming(value, { duration, easing: Eases.out });
+  withTiming(value, { duration, easing: Eases.outQuart });

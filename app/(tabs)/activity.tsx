@@ -131,7 +131,6 @@ export default function ActivityScreen() {
       if (user.budget_amount) setBudgetInput(String(user.budget_amount));
     } catch (e) {
       setCurrentUser(null);
-      Alert.alert('No User Found', 'No user exists in the app. Please sign in or create an account.');
     }
   }, [selectedMonth, selectedYear]);
 

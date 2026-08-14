@@ -8,12 +8,15 @@ import { Tabs, useRouter } from 'expo-router';
 import React from 'react';
 import { Platform } from 'react-native';
 
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 export default function TabLayout() {
   const colors = useThemeColors();
   const colorScheme = useColorScheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
-  // Removed onboarding name redirect hook so the app starts directly on the main Dashboard screen
+  const bottomInset = Math.max(insets.bottom, Platform.OS === 'ios' ? 24 : 10);
 
   return (
     <Tabs
@@ -36,8 +39,8 @@ export default function TabLayout() {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
           borderTopWidth: 0.5,
-          height: Platform.OS === 'ios' ? 88 : 64,
-          paddingBottom: Platform.OS === 'ios' ? 28 : 8,
+          height: 56 + bottomInset,
+          paddingBottom: bottomInset,
           paddingTop: 8,
           elevation: 0,
         },

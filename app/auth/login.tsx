@@ -21,6 +21,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { clearAllLocalData, setupLocalUserFromAuth } from '../../lib/database';
 import { api } from '../../lib/api';
 import { Ionicons } from '@expo/vector-icons';
+import { modernAlert } from '@/components/CustomAlert';
 
 // Safe require for Google Sign-In to prevent crashing in Expo Go
 let GoogleSignin: any = null;
@@ -60,6 +61,9 @@ export default function LoginScreen() {
   // Mode & Form states
   const [isLogin, setIsLogin] = useState(true);
   const [showEmailForm, setShowEmailForm] = useState(false);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [resetStep, setResetStep] = useState<'request' | 'verify'>('request');
+  const [resetCode, setResetCode] = useState('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -105,7 +109,7 @@ export default function LoginScreen() {
   // Google Sign-In
   async function handleGoogleSignIn() {
     if (!GoogleSignin) {
-      Alert.alert(
+      modernAlert(
         'Development Build Required',
         'Google Sign-in requires native components. Please run the app in a custom Development Build (npx expo run:ios/android or eas build) instead of standard Expo Go.'
       );
@@ -148,14 +152,14 @@ export default function LoginScreen() {
       } else if (error.code === statusCodes?.IN_PROGRESS) {
         // Sign-in already in progress
       } else if (error.code === statusCodes?.PLAY_SERVICES_NOT_AVAILABLE) {
-        Alert.alert('Error', 'Google Play Services are not available on this device.');
+        modernAlert('Error', 'Google Play Services are not available on this device.');
       } else {
         console.error('Google Sign-In Error:', error);
         let detailMsg = error.message || 'Could not sign in with Google.';
         if (error.code) {
           detailMsg += ` (Code: ${error.code})`;
         }
-        Alert.alert('Google Sign-In Failed', detailMsg);
+        modernAlert('Google Sign-In Failed', detailMsg);
       }
     } finally {
       setLoading(false);
@@ -165,7 +169,7 @@ export default function LoginScreen() {
   // Apple Sign-In (iOS only)
   async function handleAppleSignIn() {
     if (!AppleAuthentication) {
-      Alert.alert(
+      modernAlert(
         'Development Build Required',
         'Apple Sign-in requires native components. Please run the app in a custom Development Build (npx expo run:ios/android or eas build) instead of standard Expo Go.'
       );
@@ -206,7 +210,7 @@ export default function LoginScreen() {
         // User cancelled, do nothing
       } else {
         console.error('Apple Sign-In Error:', error);
-        Alert.alert('Apple Sign-In Failed', error.message || 'Could not sign in with Apple.');
+        modernAlert('Apple Sign-In Failed', error.message || 'Could not sign in with Apple.');
       }
     } finally {
       setLoading(false);
@@ -216,12 +220,12 @@ export default function LoginScreen() {
   // Traditional Email/Password Auth
   async function handleAuth() {
     if (!email || !password || (!isLogin && !name)) {
-      Alert.alert('Error', 'Please fill in all fields');
+      modernAlert('Error', 'Please fill in all fields');
       return;
     }
 
     if (!EMAIL_REGEX.test(email.trim())) {
-      Alert.alert('Error', 'Please enter a valid email address');
+      modernAlert('Error', 'Please enter a valid email address');
       return;
     }
 
@@ -237,7 +241,86 @@ export default function LoginScreen() {
       await handleSocialResult(result);
     } catch (error: any) {
       console.error('Auth Error:', error);
-      Alert.alert('Auth Failed', error.message || 'Check your credentials and try again.');
+      modernAlert('Auth Failed', error.message || 'Check your credentials and try again.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Step 1: Request Reset Code via Email
+  async function handleRequestResetCode() {
+    if (!email.trim()) {
+      modernAlert('Error', 'Please enter your registered email address');
+      return;
+    }
+
+    if (!EMAIL_REGEX.test(email.trim())) {
+      modernAlert('Error', 'Please enter a valid email address');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await api.requestResetCode(email.trim());
+      if (res.devCode) {
+        setResetCode(res.devCode);
+        modernAlert(
+          'Verification Code',
+          `Code: ${res.devCode}\n\n(Configure SMTP in splitmaro-api/.env to send real emails to your inbox).`
+        );
+      } else {
+        modernAlert(
+          'Reset Code Sent',
+          res.message || `A 6-digit verification code has been sent to ${email.trim()}. Please check your inbox and spam folder.`
+        );
+      }
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setResetStep('verify');
+    } catch (error: any) {
+      console.error('Request Reset Code Error:', error);
+      modernAlert('Error', error.message || 'Failed to send reset code. Please check your email.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Step 2: Verify Code & Update Password
+  async function handleVerifyResetCode() {
+    if (!resetCode.trim() || !password) {
+      modernAlert('Error', 'Please enter the 6-digit code and your new password');
+      return;
+    }
+
+    if (password.length < 6) {
+      modernAlert('Error', 'New password must be at least 6 characters long');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const result = await api.verifyResetCode({
+        email: email.trim(),
+        code: resetCode.trim(),
+        newPassword: password,
+      });
+
+      modernAlert('Password Reset', 'Your password has been reset successfully!', [
+        {
+          text: 'Continue to App',
+          onPress: async () => {
+            if (result.token && result.user) {
+              await handleSocialResult(result);
+            } else {
+              setIsForgotPassword(false);
+              setResetStep('request');
+              setIsLogin(true);
+            }
+          },
+        },
+      ]);
+    } catch (error: any) {
+      console.error('Verify Reset Code Error:', error);
+      modernAlert('Reset Failed', error.message || 'Invalid or expired code. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -248,7 +331,7 @@ export default function LoginScreen() {
     await clearAllLocalData();
     await AsyncStorage.removeItem('last_sync_timestamp');
     DeviceEventEmitter.emit('auth_change');
-    Alert.alert('Logged out', 'All local data cleared. Please sign in again.');
+    modernAlert('Logged out', 'All local data cleared. Please sign in again.');
     router.replace('/auth/login');
   }
 
@@ -343,13 +426,27 @@ export default function LoginScreen() {
                     </Pressable>
                   </View>
                 ) : (
-                  /* Expanded Traditional Email/Password Form */
+                  /* Expanded Traditional Email/Password / Forgot Password Form */
                   <View style={styles.emailFormContainer}>
                     <Text style={[styles.formHeader, { color: colors.text }]}>
-                      {isLogin ? 'Sign in with Email' : 'Create Email Account'}
+                      {isForgotPassword
+                        ? resetStep === 'request'
+                          ? 'Forgot Password'
+                          : 'Enter Verification Code'
+                        : isLogin
+                        ? 'Sign in with Email'
+                        : 'Create Email Account'}
                     </Text>
 
-                    {!isLogin && (
+                    {isForgotPassword && (
+                      <Text style={{ color: colors.textSecondary, fontSize: 13, marginBottom: Spacing.md, textAlign: 'center', lineHeight: 18 }}>
+                        {resetStep === 'request'
+                          ? 'Enter your registered email to receive a 6-digit reset code.'
+                          : `We sent a verification code to ${email}. Enter the code and your new password below.`}
+                      </Text>
+                    )}
+
+                    {!isLogin && !isForgotPassword && (
                       <View style={[styles.inputContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                         <Ionicons name="person-outline" size={20} color={colors.textSecondary} style={styles.inputIcon} />
                         <TextInput
@@ -362,33 +459,83 @@ export default function LoginScreen() {
                       </View>
                     )}
 
-                    <View style={[styles.inputContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                      <Ionicons name="mail-outline" size={20} color={colors.textSecondary} style={styles.inputIcon} />
-                      <TextInput
-                        style={[styles.input, { color: colors.text }]}
-                        onChangeText={setEmail}
-                        value={email}
-                        placeholder="Email Address"
-                        placeholderTextColor={colors.textTertiary}
-                        autoCapitalize={'none'}
-                        keyboardType="email-address"
-                      />
-                    </View>
+                    {(!isForgotPassword || resetStep === 'request') && (
+                      <View style={[styles.inputContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                        <Ionicons name="mail-outline" size={20} color={colors.textSecondary} style={styles.inputIcon} />
+                        <TextInput
+                          style={[styles.input, { color: colors.text }]}
+                          onChangeText={setEmail}
+                          value={email}
+                          placeholder="Email Address"
+                          placeholderTextColor={colors.textTertiary}
+                          autoCapitalize={'none'}
+                          keyboardType="email-address"
+                        />
+                      </View>
+                    )}
 
-                    <View style={[styles.inputContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                      <Ionicons name="lock-closed-outline" size={20} color={colors.textSecondary} style={styles.inputIcon} />
-                      <TextInput
-                        style={[styles.input, { color: colors.text }]}
-                        onChangeText={setPassword}
-                        value={password}
-                        secureTextEntry={true}
-                        placeholder="Password"
-                        placeholderTextColor={colors.textTertiary}
-                        autoCapitalize={'none'}
-                      />
-                    </View>
+                    {isForgotPassword && resetStep === 'verify' && (
+                      <>
+                        <View style={[styles.inputContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                          <Ionicons name="key-outline" size={20} color={colors.textSecondary} style={styles.inputIcon} />
+                          <TextInput
+                            style={[styles.input, { color: colors.text, letterSpacing: 4, fontWeight: '700' }]}
+                            onChangeText={setResetCode}
+                            value={resetCode}
+                            placeholder="6-Digit Code"
+                            placeholderTextColor={colors.textTertiary}
+                            keyboardType="number-pad"
+                            maxLength={6}
+                          />
+                        </View>
 
-                    {!isLogin && (
+                        <View style={[styles.inputContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                          <Ionicons name="lock-closed-outline" size={20} color={colors.textSecondary} style={styles.inputIcon} />
+                          <TextInput
+                            style={[styles.input, { color: colors.text }]}
+                            onChangeText={setPassword}
+                            value={password}
+                            secureTextEntry={true}
+                            placeholder="New Password (min 6 chars)"
+                            placeholderTextColor={colors.textTertiary}
+                            autoCapitalize={'none'}
+                          />
+                        </View>
+                      </>
+                    )}
+
+                    {!isForgotPassword && (
+                      <View style={[styles.inputContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                        <Ionicons name="lock-closed-outline" size={20} color={colors.textSecondary} style={styles.inputIcon} />
+                        <TextInput
+                          style={[styles.input, { color: colors.text }]}
+                          onChangeText={setPassword}
+                          value={password}
+                          secureTextEntry={true}
+                          placeholder="Password"
+                          placeholderTextColor={colors.textTertiary}
+                          autoCapitalize={'none'}
+                        />
+                      </View>
+                    )}
+
+                    {isLogin && !isForgotPassword && (
+                      <Pressable
+                        onPress={() => {
+                          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                          setIsForgotPassword(true);
+                          setResetStep('request');
+                        }}
+                        style={{ alignSelf: 'flex-end', marginTop: 2, marginBottom: Spacing.sm }}
+                        hitSlop={8}
+                      >
+                        <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '600' }}>
+                          Forgot Password?
+                        </Text>
+                      </Pressable>
+                    )}
+
+                    {!isLogin && !isForgotPassword && (
                       <View style={[styles.inputContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                         <Ionicons name="gift-outline" size={20} color={colors.textSecondary} style={styles.inputIcon} />
                         <TextInput
@@ -403,36 +550,88 @@ export default function LoginScreen() {
                     )}
 
                     <Pressable
-                      style={[styles.btn, { backgroundColor: colors.primary, opacity: loading ? 0.7 : 1 }]}
+                      style={[styles.btn, { backgroundColor: colors.primary, opacity: loading ? 0.7 : 1, marginTop: isLogin && !isForgotPassword ? 4 : Spacing.md }]}
                       disabled={loading}
-                      onPress={handleAuth}
+                      onPress={
+                        isForgotPassword
+                          ? resetStep === 'request'
+                            ? handleRequestResetCode
+                            : handleVerifyResetCode
+                          : handleAuth
+                      }
                     >
                       {loading ? (
                         <ActivityIndicator color="#FFF" />
                       ) : (
-                        <Text style={styles.btnText}>{isLogin ? 'Sign In' : 'Sign Up'}</Text>
+                        <Text style={styles.btnText}>
+                          {isForgotPassword
+                            ? resetStep === 'request'
+                              ? 'Send Reset Code'
+                              : 'Verify & Reset Password'
+                            : isLogin
+                            ? 'Sign In'
+                            : 'Sign Up'}
+                        </Text>
                       )}
                     </Pressable>
 
                     <View style={styles.emailFooter}>
-                      <Pressable
-                        onPress={() => {
-                          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                          setIsLogin(!isLogin);
-                        }}
-                        disabled={loading}
-                      >
-                        <Text style={{ color: colors.textSecondary, textAlign: 'center' }}>
-                          {isLogin ? "Don't have an account? " : "Already have an account? "}
-                          <Text style={{ color: colors.primary, fontWeight: '700' }}>
-                            {isLogin ? 'Sign Up' : 'Sign In'}
+                      {isForgotPassword ? (
+                        <>
+                          {resetStep === 'verify' && (
+                            <Pressable
+                              onPress={() => {
+                                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                                handleRequestResetCode();
+                              }}
+                              disabled={loading}
+                              style={{ marginBottom: Spacing.sm }}
+                            >
+                              <Text style={{ color: colors.primary, textAlign: 'center', fontWeight: '600', fontSize: 13 }}>
+                                Resend Reset Code
+                              </Text>
+                            </Pressable>
+                          )}
+
+                          <Pressable
+                            onPress={() => {
+                              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                              setIsForgotPassword(false);
+                              setResetStep('request');
+                              setIsLogin(true);
+                            }}
+                            disabled={loading}
+                          >
+                            <Text style={{ color: colors.textSecondary, textAlign: 'center' }}>
+                              Remember your password?{' '}
+                              <Text style={{ color: colors.primary, fontWeight: '700' }}>
+                                Sign In
+                              </Text>
+                            </Text>
+                          </Pressable>
+                        </>
+                      ) : (
+                        <Pressable
+                          onPress={() => {
+                            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                            setIsLogin(!isLogin);
+                          }}
+                          disabled={loading}
+                        >
+                          <Text style={{ color: colors.textSecondary, textAlign: 'center' }}>
+                            {isLogin ? "Don't have an account? " : "Already have an account? "}
+                            <Text style={{ color: colors.primary, fontWeight: '700' }}>
+                              {isLogin ? 'Sign Up' : 'Sign In'}
+                            </Text>
                           </Text>
-                        </Text>
-                      </Pressable>
+                        </Pressable>
+                      )}
 
                       <Pressable
                         onPress={() => {
                           LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                          setIsForgotPassword(false);
+                          setResetStep('request');
                           setShowEmailForm(false);
                         }}
                         disabled={loading}

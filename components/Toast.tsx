@@ -55,8 +55,8 @@ function ToastItem({ item, onDismiss }: { item: ToastItem; onDismiss: () => void
 
   return (
     <Animated.View
-      entering={FadeInDown.springify().damping(20).stiffness(300)}
-      exiting={FadeOutUp.duration(200)}
+      entering={FadeInDown.springify().damping(20).stiffness(380).mass(0.6)}
+      exiting={FadeOutUp.duration(140)}
       style={[
         styles.toast,
         { backgroundColor: cfg.bg, marginTop: insets.top + Spacing.sm },

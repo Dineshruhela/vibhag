@@ -110,6 +110,10 @@ export async function apiRequest(path: string, options: RequestInit = {}) {
 export const api = {
   signup: (data: any) => apiRequest('/auth/signup', { method: 'POST', body: JSON.stringify(data) }),
   login: (data: any) => apiRequest('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
+  requestResetCode: (email: string) =>
+    apiRequest('/auth/forgot-password/request', { method: 'POST', body: JSON.stringify({ email }) }),
+  verifyResetCode: (data: { email: string; code: string; newPassword: string }) =>
+    apiRequest('/auth/forgot-password/verify', { method: 'POST', body: JSON.stringify(data) }),
   socialLogin: (data: {
     idToken: string;
     provider: 'google' | 'apple';

@@ -12,6 +12,7 @@ import jwt from 'jsonwebtoken';
 import path from 'path';
 import { Server } from 'socket.io';
 import { v4 as uuidv4 } from 'uuid';
+import nodemailer from 'nodemailer';
 // @ts-ignore - apple-signin-auth has no types
 import appleSignin from 'apple-signin-auth';
 // @ts-ignore
@@ -269,6 +270,158 @@ app.post('/auth/reset-password', async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Failed to reset password' });
+  }
+});
+
+// --- EMAIL TRANSPORTER CONFIGURATION ---
+const emailTransporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || 'smtp.gmail.com',
+  port: parseInt(process.env.SMTP_PORT || '587', 10),
+  secure: process.env.SMTP_SECURE === 'true',
+  auth: {
+    user: process.env.SMTP_USER || process.env.EMAIL_USER || '',
+    pass: process.env.SMTP_PASS || process.env.EMAIL_PASS || '',
+  },
+});
+
+// Store OTP verification codes with 15-minute expiration
+const resetCodeStore = new Map<string, { code: string; expiresAt: number }>();
+
+async function sendPasswordResetEmail(toEmail: string, code: string, userName: string) {
+  const mailOptions = {
+    from: process.env.EMAIL_FROM || '"Splitmaro Security" <noreply@splitmaro.com>',
+    to: toEmail,
+    subject: `Your Splitmaro Password Reset Code: ${code}`,
+    text: `Hello ${userName},\n\nYour password reset verification code is: ${code}\n\nThis code will expire in 15 minutes. If you did not request a password reset, please ignore this email.\n\nBest regards,\nThe Splitmaro Team`,
+    html: `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px 24px; background-color: #0F172A; border-radius: 16px; color: #F8FAFC;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h1 style="color: #10B981; margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -0.5px;">Splitmaro</h1>
+          <p style="color: #94A3B8; margin-top: 4px; font-size: 14px;">Password Reset Verification</p>
+        </div>
+        <div style="background-color: #1E293B; border-radius: 12px; padding: 24px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.08);">
+          <p style="margin: 0 0 16px 0; font-size: 15px; color: #E2E8F0;">Hello <strong>${userName}</strong>,</p>
+          <p style="margin: 0 0 20px 0; font-size: 14px; color: #94A3B8;">Use the verification code below to reset your password:</p>
+          <div style="display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #10B981 0%, #059669 100%); border-radius: 10px; font-size: 32px; font-weight: 800; letter-spacing: 6px; color: #FFFFFF; font-family: monospace;">
+            ${code}
+          </div>
+          <p style="margin: 20px 0 0 0; font-size: 12px; color: #64748B;">This code is valid for <strong>15 minutes</strong>.</p>
+        </div>
+        <p style="text-align: center; margin-top: 24px; font-size: 12px; color: #64748B;">
+          If you did not request this password reset, please ignore this email.
+        </p>
+      </div>
+    `,
+  };
+
+  if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+    try {
+      await emailTransporter.sendMail(mailOptions);
+      console.log(`[Email] Password reset email sent to ${toEmail}`);
+    } catch (err: any) {
+      console.error(`[Email Error] Failed to send email to ${toEmail}:`, err.message);
+    }
+  } else {
+    console.log(`\n======================================================`);
+    console.log(`[PASSWORD RESET EMAIL] To: ${toEmail} | Verification Code: ${code}`);
+    console.log(`======================================================\n`);
+  }
+}
+
+// 1. Request Password Reset Code
+app.post('/auth/forgot-password/request', async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: 'Email is required' });
+  }
+
+  const normalizedEmail = email.toLowerCase().trim();
+
+  try {
+    const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+    if (!user) {
+      return res.status(404).json({ error: 'No account found with this email address' });
+    }
+
+    if (!user.password_hash) {
+      return res.status(400).json({
+        error: 'This account was signed up via Google or Apple. Please sign in using social login.',
+      });
+    }
+
+    // Generate 6-digit numeric OTP code
+    const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = Date.now() + 15 * 60 * 1000; // 15 minutes validity
+    resetCodeStore.set(normalizedEmail, { code: resetCode, expiresAt });
+
+    await sendPasswordResetEmail(normalizedEmail, resetCode, user.name || 'Splitmaro User');
+
+    const hasSmtp = Boolean(process.env.SMTP_USER && process.env.SMTP_PASS);
+    res.json({
+      success: true,
+      message: hasSmtp
+        ? `A 6-digit reset code has been sent to ${normalizedEmail}.`
+        : `Reset code generated: ${resetCode}`,
+      devCode: hasSmtp ? undefined : resetCode,
+    });
+  } catch (error) {
+    console.error('Request Reset Code Error:', error);
+    res.status(500).json({ error: 'Failed to send reset code. Please try again.' });
+  }
+});
+
+// 2. Verify Code & Set New Password
+app.post('/auth/forgot-password/verify', async (req, res) => {
+  const { email, code, newPassword } = req.body;
+  if (!email || !code || !newPassword) {
+    return res.status(400).json({ error: 'Email, verification code, and new password are required' });
+  }
+
+  const normalizedEmail = email.toLowerCase().trim();
+  const normalizedCode = code.toString().trim();
+
+  try {
+    const stored = resetCodeStore.get(normalizedEmail);
+    if (!stored) {
+      return res.status(400).json({ error: 'No active reset request found. Please request a new code.' });
+    }
+
+    if (Date.now() > stored.expiresAt) {
+      resetCodeStore.delete(normalizedEmail);
+      return res.status(400).json({ error: 'Reset code has expired. Please request a new code.' });
+    }
+
+    if (stored.code !== normalizedCode) {
+      return res.status(400).json({ error: 'Invalid verification code. Please check and try again.' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    const updatedUser = await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password_hash: passwordHash,
+        updated_at: BigInt(Date.now()),
+      },
+    });
+
+    // Invalidate code after successful reset
+    resetCodeStore.delete(normalizedEmail);
+
+    const token = jwt.sign({ userId: updatedUser.id, email: updatedUser.email }, JWT_SECRET);
+    res.json({
+      success: true,
+      message: 'Password reset successfully. You are now signed in.',
+      token,
+      user: updatedUser,
+    });
+  } catch (error) {
+    console.error('Verify Reset Code Error:', error);
+    res.status(500).json({ error: 'Failed to reset password. Please try again.' });
   }
 });
 

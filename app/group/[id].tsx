@@ -16,6 +16,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import React, { useCallback, useState } from 'react';
 import { Alert, DeviceEventEmitter, Linking, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { modernAlert } from '@/components/CustomAlert';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { FlashList } from '@shopify/flash-list';
@@ -88,14 +89,14 @@ export default function GroupDetailScreen() {
 
   const handleDeleteGroup = () => {
     Haptics.selectionAsync();
-    Alert.alert('Delete Group', 'This will delete all expenses. Continue?', [
+    modernAlert('Delete Group', 'This will delete all expenses. Continue?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => { await deleteGroup(id!); Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); router.back(); } },
     ]);
   };
 
   const handleDeleteExpense = (expId: string) => {
-    Alert.alert('Delete Expense', 'Are you sure?', [
+    modernAlert('Delete Expense', 'Are you sure you want to delete this expense?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => {
         await deleteExpense(expId);
@@ -118,13 +119,13 @@ export default function GroupDetailScreen() {
       await FileSystem.writeAsStringAsync(fileUri, csv, { encoding: FileSystem.EncodingType.UTF8 });
       await Sharing.shareAsync(fileUri, { dialogTitle: 'Export Group Expenses' });
     } catch (e) {
-      Alert.alert('Error', 'Failed to export data');
+      modernAlert('Error', 'Failed to export data');
     }
   };
 
   const handleUPIPayment = async (toUser: User, amount: number) => {
     if (!toUser.upi_id) {
-      Alert.alert('No UPI ID', `${toUser.name} hasn't added their UPI ID yet.`);
+      modernAlert('No UPI ID', `${toUser.name} hasn't added their UPI ID yet.`);
       return;
     }
     
@@ -134,7 +135,7 @@ export default function GroupDetailScreen() {
       const supported = await Linking.canOpenURL(upiUrl);
       if (supported) {
         await Linking.openURL(upiUrl);
-        Alert.alert('Mark as Settled?', 'Once you complete the payment, would you like to record this settlement in the app?', [
+        modernAlert('Mark as Settled?', 'Once you complete the payment, would you like to record this settlement in the app?', [
           { text: 'Not Now', style: 'cancel' },
           { text: 'Yes, Record it', onPress: () => router.push({ 
             pathname: '/group/settle', 
@@ -142,10 +143,10 @@ export default function GroupDetailScreen() {
           }) }
         ]);
       } else {
-        Alert.alert('No UPI App', 'Could not find any UPI apps to handle this payment.');
+        modernAlert('No UPI App', 'Could not find any UPI apps to handle this payment.');
       }
     } catch (e) {
-      Alert.alert('Error', 'Failed to open payment app');
+      modernAlert('Error', 'Failed to open payment app');
     }
   };
 
@@ -208,7 +209,7 @@ export default function GroupDetailScreen() {
           </Pressable>
           <Pressable 
             onPress={() => {
-              Alert.alert(group.name, 'Group options', [
+              modernAlert(group.name, 'Group options', [
                 { text: 'Delete Group', style: 'destructive', onPress: handleDeleteGroup },
                 { text: 'Cancel', style: 'cancel' },
               ]);

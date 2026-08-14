@@ -2,6 +2,7 @@
  * Root Layout for Splitmaro
  */
 import { ToastProvider } from '@/components/Toast';
+import { AlertProvider } from '@/components/CustomAlert';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useNotifications } from '@/hooks/useNotifications';
@@ -164,129 +165,132 @@ function RootLayoutInner() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ToastProvider>
-      <ThemeProvider value={colorScheme === 'dark' ? SplitmaroDarkTheme : SplitmaroLightTheme}>
-        <GlobalProgressBar />
-        <Stack
-        screenOptions={{
-          headerShown: false,
-          animation: 'slide_from_right',
-        }}
-      >
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="group/[id]"
-          options={{
-            headerShown: false,
-            animation: 'slide_from_right',
-          }}
-        />
-        <Stack.Screen
-          name="group/create"
-          options={{
-            presentation: 'modal',
-            headerShown: false,
-            animation: 'slide_from_bottom',
-          }}
-        />
-        <Stack.Screen
-          name="group/invite"
-          options={{
-            presentation: 'modal',
-            headerShown: false,
-            animation: 'slide_from_bottom',
-          }}
-        />
-        <Stack.Screen
-          name="group/add-expense"
-          options={{
-            presentation: 'modal',
-            headerShown: false,
-            animation: 'slide_from_bottom',
-          }}
-        />
-        <Stack.Screen
-          name="group/expense/edit"
-          options={{
-            presentation: 'modal',
-            headerShown: false,
-            animation: 'slide_from_bottom',
-          }}
-        />
-        <Stack.Screen
-          name="group/settle"
-          options={{
-            presentation: 'modal',
-            headerShown: false,
-            animation: 'slide_from_bottom',
-          }}
-        />
-        <Stack.Screen
-          name="friends/add"
-          options={{
-            presentation: 'modal',
-            headerShown: false,
-            animation: 'slide_from_bottom',
-          }}
-        />
-        <Stack.Screen
-          name="join/[groupId]"
-          options={{
-            presentation: 'modal',
-            headerShown: false,
-            animation: 'slide_from_bottom',
-          }}
-        />
-        <Stack.Screen
-          name="auth/login"
-          options={{
-            presentation: 'modal',
-            headerShown: false,
-            animation: 'slide_from_bottom',
-          }}
-        />
-        <Stack.Screen
-          name="pro/referrals"
-          options={{
-            presentation: 'modal',
-            headerShown: false,
-            animation: 'slide_from_bottom',
-          }}
-        />
-        <Stack.Screen
-          name="onboarding"
-          options={{
-            headerShown: false,
-            animation: 'fade',
-          }}
-        />
-        <Stack.Screen
-          name="group/members"
-          options={{
-            presentation: 'modal',
-            headerShown: false,
-            animation: 'slide_from_bottom',
-          }}
-        />
-        <Stack.Screen
-          name="group/expense/[id]"
-          options={{
-            headerShown: false,
-            animation: 'slide_from_right',
-          }}
-        />
+        <AlertProvider>
+          <ThemeProvider value={colorScheme === 'dark' ? SplitmaroDarkTheme : SplitmaroLightTheme}>
+            <GlobalProgressBar />
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                animation: 'slide_from_right',
+                animationDuration: 240,
+              }}
+            >
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen
+                name="group/[id]"
+                options={{
+                  headerShown: false,
+                  animation: 'slide_from_right',
+                }}
+              />
+              <Stack.Screen
+                name="group/create"
+                options={{
+                  presentation: 'modal',
+                  headerShown: false,
+                  animation: 'slide_from_bottom',
+                }}
+              />
+              <Stack.Screen
+                name="group/invite"
+                options={{
+                  presentation: 'modal',
+                  headerShown: false,
+                  animation: 'slide_from_bottom',
+                }}
+              />
+              <Stack.Screen
+                name="group/add-expense"
+                options={{
+                  presentation: 'modal',
+                  headerShown: false,
+                  animation: 'slide_from_bottom',
+                }}
+              />
+              <Stack.Screen
+                name="group/expense/edit"
+                options={{
+                  presentation: 'modal',
+                  headerShown: false,
+                  animation: 'slide_from_bottom',
+                }}
+              />
+              <Stack.Screen
+                name="group/settle"
+                options={{
+                  presentation: 'modal',
+                  headerShown: false,
+                  animation: 'slide_from_bottom',
+                }}
+              />
+              <Stack.Screen
+                name="friends/add"
+                options={{
+                  presentation: 'modal',
+                  headerShown: false,
+                  animation: 'slide_from_bottom',
+                }}
+              />
+              <Stack.Screen
+                name="join/[groupId]"
+                options={{
+                  presentation: 'modal',
+                  headerShown: false,
+                  animation: 'slide_from_bottom',
+                }}
+              />
+              <Stack.Screen
+                name="auth/login"
+                options={{
+                  presentation: 'modal',
+                  headerShown: false,
+                  animation: 'slide_from_bottom',
+                }}
+              />
+              <Stack.Screen
+                name="pro/referrals"
+                options={{
+                  presentation: 'modal',
+                  headerShown: false,
+                  animation: 'slide_from_bottom',
+                }}
+              />
+              <Stack.Screen
+                name="onboarding"
+                options={{
+                  headerShown: false,
+                  animation: 'fade',
+                }}
+              />
+              <Stack.Screen
+                name="group/members"
+                options={{
+                  presentation: 'modal',
+                  headerShown: false,
+                  animation: 'slide_from_bottom',
+                }}
+              />
+              <Stack.Screen
+                name="group/expense/[id]"
+                options={{
+                  headerShown: false,
+                  animation: 'slide_from_right',
+                }}
+              />
 
-        <Stack.Screen
-          name="admin/dashboard"
-          options={{
-            headerShown: false,
-            animation: 'slide_from_right',
-          }}
-        />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-      <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-    </ThemeProvider>
-    </ToastProvider>
+              <Stack.Screen
+                name="admin/dashboard"
+                options={{
+                  headerShown: false,
+                  animation: 'slide_from_right',
+                }}
+              />
+              <Stack.Screen name="+not-found" />
+            </Stack>
+            <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+          </ThemeProvider>
+        </AlertProvider>
+      </ToastProvider>
     </GestureHandlerRootView>
   );
 }

@@ -55,7 +55,6 @@ export default function DashboardScreen() {
       setTotalOwe(overallData.totalOwe);
     } catch (e) {
       setCurrentUser(null);
-      Alert.alert('No User Found', 'No user exists in the app. Please sign in or create an account.');
     } finally {
       setLoading(false);
     }

@@ -5,10 +5,11 @@ import { Avatar } from '@/components/Avatar';
 import { AvatarColors } from '@/constants/Colors';
 import { BorderRadius, Spacing } from '@/constants/Spacing';
 import { useThemeColors } from '@/hooks/useThemeColor';
+import { modernAlert } from '@/components/CustomAlert';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { addFriend, getUser, updateUser } from '../../lib/database';
 
@@ -19,8 +20,12 @@ export default function AddFriendScreen() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [selectedColor, setSelectedColor] = useState(AvatarColors[0]);
   const [saving, setSaving] = useState(false);
+
+  // Derive color deterministically from name
+  const avatarColor = name.trim()
+    ? AvatarColors[Math.abs(name.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)) % AvatarColors.length]
+    : AvatarColors[0];
 
   React.useEffect(() => {
     if (id) {
@@ -30,32 +35,31 @@ export default function AddFriendScreen() {
           setName(u.name);
           setEmail(u.email || '');
           setPhone(u.phone || '');
-          setSelectedColor(u.avatar_color);
         }
       })();
     }
   }, [id]);
 
   const handleSave = async () => {
-    if (!name.trim()) { Alert.alert('Error', 'Please enter a name.'); return; }
+    if (!name.trim()) { modernAlert('Error', 'Please enter a name.'); return; }
     const trimmedEmail = email.trim().toLowerCase();
     
     const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (trimmedEmail && !EMAIL_REGEX.test(trimmedEmail)) { 
-      Alert.alert('Error', 'Please enter a valid email address.'); 
+      modernAlert('Error', 'Please enter a valid email address.'); 
       return; 
     }
 
     setSaving(true);
     try {
       if (id) {
-        await updateUser(id, { name: name.trim(), email: trimmedEmail || undefined, phone: phone.trim() || undefined, avatar_color: selectedColor });
+        await updateUser(id, { name: name.trim(), email: trimmedEmail || undefined, phone: phone.trim() || undefined, avatar_color: avatarColor });
       } else {
-        await addFriend(name.trim(), trimmedEmail || undefined, phone.trim() || undefined, selectedColor);
+        await addFriend(name.trim(), trimmedEmail || undefined, phone.trim() || undefined, avatarColor);
       }
       router.back();
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to save friend.');
+      modernAlert('Error', e.message || 'Failed to save friend.');
     } finally {
       setSaving(false);
     }
@@ -76,20 +80,8 @@ export default function AddFriendScreen() {
       <ScrollView contentContainerStyle={styles.scroll}>
         {/* Preview */}
         <View style={styles.preview}>
-          <Avatar name={name || '?'} color={selectedColor} size={80} fontSize={28} />
+          <Avatar name={name || '?'} color={avatarColor} size={80} fontSize={28} />
           {name.trim() !== '' && <Text style={[styles.previewName, { color: colors.text }]}>{name}</Text>}
-        </View>
-
-        {/* Avatar color */}
-        <Text style={[styles.label, { color: colors.textSecondary }]}>AVATAR COLOR</Text>
-        <View style={styles.colorRow}>
-          {AvatarColors.map(c => (
-            <Pressable
-              key={c}
-              onPress={() => setSelectedColor(c)}
-              style={[styles.colorDot, { backgroundColor: c, borderWidth: selectedColor === c ? 3 : 0, borderColor: colors.text }]}
-            />
-          ))}
         </View>
 
         <Text style={[styles.label, { color: colors.textSecondary }]}>NAME *</Text>

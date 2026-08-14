@@ -41,7 +41,6 @@ export default function GroupsScreen() {
     } catch (e) {
       setGroups([]);
       setBalances({});
-      Alert.alert('No User Found', 'No user exists in the app. Please sign in or create an account.');
     } finally {
       setLoading(false);
     }

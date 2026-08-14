@@ -4,7 +4,6 @@
 import { Avatar } from '@/components/Avatar';
 import { Card } from '@/components/Card';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { AvatarColors } from '@/constants/Colors';
 import { BorderRadius, Spacing } from '@/constants/Spacing';
 import { useSync } from '@/hooks/useSync';
 import { useThemeColors } from '@/hooks/useThemeColor';
@@ -15,6 +14,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Alert, DeviceEventEmitter, Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { modernAlert } from '@/components/CustomAlert';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import Constants from 'expo-constants';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -55,7 +55,6 @@ export default function ProfileScreen() {
       }
     } catch {
       setUser(null);
-      Alert.alert('No User Found', 'No user exists in the app. Please sign in or create an account.');
     }
   };
 
@@ -71,14 +70,14 @@ export default function ProfileScreen() {
   const handleRefresh = async () => {
     await pullFromCloud();
     await loadUser();
-    Alert.alert('Refreshed', 'Profile synced with server.');
+    modernAlert('Refreshed', 'Profile synced with server.');
   };
 
   const handleSave = async () => {
     if (!user) return;
     const trimmedUpi = upiId.trim();
     if (trimmedUpi && !UPI_REGEX.test(trimmedUpi)) {
-      Alert.alert('Invalid UPI ID', 'UPI ID must be in the format username@bankcode (e.g. john@okaxis).');
+      modernAlert('Invalid UPI ID', 'UPI ID must be in the format username@bankcode (e.g. john@okaxis).');
       return;
     }
     setSaving(true);
@@ -86,22 +85,11 @@ export default function ProfileScreen() {
       await updateUser(user.id, { name: name.trim(), upi_id: trimmedUpi || null });
       const updated = await getCurrentUser();
       setUser(updated);
-      Alert.alert('Success', 'Profile updated');
+      modernAlert('Success', 'Profile updated');
     } catch (e) {
-      Alert.alert('Error', 'Failed to update profile');
+      modernAlert('Error', 'Failed to update profile');
     } finally {
       setSaving(false);
-    }
-  };
-
-  const updateColor = async (color: string) => {
-    if (!user) return;
-    try {
-      await updateUser(user.id, { avatar_color: color });
-      const updated = await getCurrentUser();
-      setUser(updated);
-    } catch (e) {
-      Alert.alert('Error', 'Failed to update avatar color');
     }
   };
 
@@ -116,7 +104,7 @@ export default function ProfileScreen() {
   };
 
   const handleSignOut = async () => {
-    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+    modernAlert('Sign Out', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Sign Out',
@@ -129,7 +117,7 @@ export default function ProfileScreen() {
             DeviceEventEmitter.emit('auth_change');
             router.replace('/auth/login');
           } catch (e) {
-            Alert.alert('Error', 'Failed to sign out');
+            modernAlert('Error', 'Failed to sign out');
           }
         }
       }
@@ -137,7 +125,7 @@ export default function ProfileScreen() {
   };
 
   const handleDeactivateAccount = () => {
-    Alert.alert('Deactivate Account', 'Are you sure? This will remove your from all groups and log you out. Your past financial records will remain for other users.', [
+    modernAlert('Deactivate Account', 'Are you sure? This will remove your from all groups and log you out. Your past financial records will remain for other users.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Deactivate Account',
@@ -148,7 +136,7 @@ export default function ProfileScreen() {
             DeviceEventEmitter.emit('auth_change');
             router.replace('/auth/login');
           } catch (e) {
-            Alert.alert('Error', 'Failed to deactivate account');
+            modernAlert('Error', 'Failed to deactivate account');
           }
         }
       }
@@ -157,7 +145,7 @@ export default function ProfileScreen() {
 
   const handleClearAllLocal = async () => {
     await clearAllLocalData();
-    Alert.alert('Local Data Cleared', 'All local app data has been wiped.');
+    modernAlert('Local Data Cleared', 'All local app data has been wiped.');
     DeviceEventEmitter.emit('auth_change');
     router.replace('/auth/login');
   };
@@ -252,27 +240,6 @@ export default function ProfileScreen() {
               </View>
               <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
             </Pressable>
-          </Card>
-        </Animated.View>
-        )}
-
-        {!user.avatar_url && (
-        <Animated.View entering={FadeInDown.delay(300).springify()}>
-          <Text style={[styles.label, { color: colors.textSecondary, marginTop: Spacing.xl }]}>AVATAR COLOR</Text>
-          <Card variant="default" style={styles.colorCard}>
-            <View style={styles.colorGrid}>
-              {AvatarColors.map(color => (
-                <Pressable
-                  key={color}
-                  onPress={() => updateColor(color)}
-                  style={[
-                    styles.colorCircle,
-                    { backgroundColor: color },
-                    user.avatar_color === color && { borderWidth: 3, borderColor: colors.text }
-                  ]}
-                />
-              ))}
-            </View>
           </Card>
         </Animated.View>
         )}
