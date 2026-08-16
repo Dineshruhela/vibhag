@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "npx prisma generate && tsc",
+    "build": "npx prisma generate && tsc && cp -r public dist/",
     "postinstall": "npx prisma generate",
     "start": "npx prisma db push && node dist/index.js",
     "dev": "tsx watch index.ts",

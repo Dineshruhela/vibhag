@@ -17,7 +17,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.dineshruhela.vibhag",
       "usesAppleSignIn": true,
-      "buildNumber": "33",
+      "buildNumber": "36",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       },
@@ -30,7 +30,7 @@
       },
       "edgeToEdgeEnabled": true,
       "package": "com.dineshruhela.vibhag",
-      "versionCode": 35
+      "versionCode": 38
     },
     "web": {
       "bundler": "metro",

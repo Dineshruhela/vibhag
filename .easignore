@@ -1,0 +1,56 @@
+# Dependencies
+node_modules/
+
+# Expo & Metro
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+.metro-health-check*
+
+# Git
+.git/
+
+# Native folders (managed workflow - EAS runs prebuild on cloud)
+/android
+/ios
+.kotlin/
+
+# Keys & certs
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem
+
+# Env files (EAS uses env vars configured in eas.json)
+.env
+.env*.local
+
+# Typescript & Debug
+*.tsbuildinfo
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# OS
+.DS_Store
+
+# Non-mobile project directories
+splitmaro-api/
+splitmaro-landing/
+dinesh-portfolio/
+app-policies/
+ss/
+
+# Assets, screenshots & documentation
+AppStore_Screenshots_*/
+upgrade_screenshot_*.png
+Screenshot_*.png
+screenshot_*.png
+*.aab
+*.apk
+*.sql
+*.sh
+*.md

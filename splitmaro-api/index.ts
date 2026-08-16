@@ -78,27 +78,35 @@ if (process.env.PROXY_TO_CLOUD === 'true') {
   });
 }
 
+const PUBLIC_DIR = fs.existsSync(path.join(__dirname, 'public'))
+  ? path.join(__dirname, 'public')
+  : path.join(__dirname, '..', 'public');
+
 app.get('/', (req, res) => {
-  const host = req.headers.host || '';
-  if (host.includes('api.dineshruhela.com')) {
-    return res.sendFile(path.join(__dirname, 'public', 'index.html'));
-  }
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
 });
 
 app.get('/privacy', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'privacy.html'));
+  res.sendFile(path.join(PUBLIC_DIR, 'privacy.html'));
 });
 
 app.get('/terms', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'terms.html'));
+  res.sendFile(path.join(PUBLIC_DIR, 'terms.html'));
 });
 
 app.get('/support', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'support.html'));
+  res.sendFile(path.join(PUBLIC_DIR, 'support.html'));
 });
 
-app.use(express.static(path.join(__dirname, 'public')));
+app.get('/copyright', (req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, 'copyright.html'));
+});
+
+app.get('/policies', (req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, 'policies.html'));
+});
+
+app.use(express.static(PUBLIC_DIR));
 
 // BigInt Serialization Fix for JSON
 (BigInt.prototype as any).toJSON = function () {
@@ -919,7 +927,7 @@ app.post('/api/upload', authenticateToken as any, async (req: AuthRequest, res) 
       return res.status(400).json({ error: 'Unsupported receipt image type' });
     }
     const filename = `${uuidv4()}${ext}`;
-    const uploadDir = path.join(__dirname, 'public', 'uploads');
+    const uploadDir = path.join(PUBLIC_DIR, 'uploads');
 
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
